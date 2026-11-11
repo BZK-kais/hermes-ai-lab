@@ -2,36 +2,10 @@
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-import os
-from pathlib import Path
-import secrets
-import stat
+from contextvars import copy_context
 
 from . import tool_api
-
-
-def _token_file(path):
-    path = Path(path).absolute()
-    if path.is_symlink():
-        raise ValueError('unsafe token file')
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    try:
-        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
-    except FileExistsError:
-        fd = os.open(str(path), os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
-        with os.fdopen(fd, 'r', encoding='ascii') as stream:
-            info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077 or info.st_nlink != 1:
-                raise ValueError('unsafe token permissions')
-            token = stream.read(257).strip()
-        if len(token) < 32 or len(token) > 256 or not token.isascii() or any(ch.isspace() for ch in token):
-            raise ValueError('invalid token file')
-        return str(path), token
-    token = secrets.token_urlsafe(32)
-    with os.fdopen(fd, 'w', encoding='ascii') as stream:
-        os.fchmod(stream.fileno(), 0o600)
-        stream.write(token + '\n')
-    return str(path), token
+from .credentials import resolve_secret, CredentialError
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -125,23 +99,28 @@ class _Server(ThreadingHTTPServer):
     daemon_threads = True
     block_on_close = False
 
+    def process_request_thread(self, request, client_address):
+        # A server belongs to the profile that started it, including concurrent requests.
+        self._request_context.copy().run(super().process_request_thread, request, client_address)
 
-def create_server(port=0, token_file=None):
-    if type(port) is not int or not 0 <= port <= 65535 or token_file is None:
-        raise ValueError('port and token file are required')
-    filename, token = _token_file(token_file)
+
+def create_server(port=0):
+    if type(port) is not int or not 0 <= port <= 65535:
+        raise ValueError('A valid loopback port is required.')
+    token = resolve_secret('hermes:AI_LAB_HTTP_API_KEY')
+    if len(token) < 32 or not token.isascii():
+        raise CredentialError('Configure a strong HTTP API key in Hermes.')
     server = _Server(('127.0.0.1', port), _Handler)
     server._api_token = token
-    server.token_file = filename
+    server._request_context = copy_context()
     return server
 
 
-def main(port=8765, token_file=None):
-    from .jobs import _root
-    token_file = token_file or _root() / 'api.token'
-    server = create_server(port, token_file)
+def main(port=8765):
+    server = create_server(port)
     print(tool_api.encode({'ok': True, 'host': '127.0.0.1', 'port': server.server_address[1],
-                           'token_file': server.token_file, 'api_version': tool_api.API_VERSION}), flush=True)
+                           'credential_ref': 'hermes:AI_LAB_HTTP_API_KEY',
+                           'api_version': tool_api.API_VERSION}), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

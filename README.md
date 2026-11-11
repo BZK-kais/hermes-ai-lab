@@ -1,10 +1,10 @@
-# Hermes AI Lab 1.0
+# Hermes AI Lab 1.1
 
 AI Lab est un plugin natif pour préparer une mission, comparer des configurations de modèle et utiliser celle qui satisfait les critères fixés. Il expose **22 outils Hermes** et le skill **`ai-lab:workflow`**. Les jobs, les rapports et les configurations actives sont rattachés au profil. Le même contrat est accessible par le CLI `ailab`, MCP stdio et une API HTTP locale.
 
 ## Installer dans Hermes
 
-Décompresser l’archive du plugin, puis utiliser **le Python de l’installation Hermes** (Hermes 0.20.1 ou plus récent) avec un profil existant.
+Décompresser l’archive du plugin, puis utiliser **le Python de l’installation Hermes** (Hermes 0.23.1 ou plus récent) avec un profil existant.
 
 ```sh
 /chemin/vers/python-hermes /chemin/archive/ai-lab/scripts/install_local.py \
@@ -28,6 +28,14 @@ hermes ai-lab profile
 
 Ouvrir une nouvelle session Hermes. Exemple de demande : « Utilise `ai-lab:workflow` pour rendre mon modèle local plus rapide sur ce jeu d'extraction JSON. Choisis les réglages compatibles, compare-les et conserve les résultats pour les prochains essais. » Le skill prend en charge les choix techniques ; il demande seulement le contexte métier ou les accès réellement manquants.
 
+## Accès et limites de la version 1.1
+
+Les accès facultatifs se configurent dans les paramètres du plugin Hermes. Les clés déclarées sont lues par `agent.secret_scope.get_secret` dans le profil actif. Les connexions contiennent uniquement une référence telle que `hermes:AI_LAB_HF_TOKEN`. Les anciennes références `env:`, `file:`, `gcp:` et `native` sont refusées. Le plugin ne lit aucun coffre de credentials, ne lance pas `gcloud` et ne réutilise pas les identifiants implicites des SDK. Voir [la migration des accès](docs/credential-migration.md) et [les vérifications 1.1](docs/releases/2026-11-11-credentials.md).
+
+Google utilise le client OAuth de l’utilisateur déclaré dans Hermes et `hermes auth add ai-lab:google`. Hermes conserve et renouvelle les jetons. GCS expose uniquement les métadonnées en lecture ; les transferts GCS et l’exécution SSH attendent une route Hermes adaptée et retournent une erreur explicite. Les transferts HF/S3 s’exécutent dans la session active avec un reçu de job, sans reprise automatique après perte de session. Les jobs locaux restent détachés.
+
+**Comportements à connaître avant installation :** les opérations explicites peuvent appeler Hugging Face, Runpod, AWS S3, Google Storage et les endpoints configurés ; lire les modèles et données sous les répertoires autorisés ; écrire les artefacts et rapports du profil ; lancer des exécutables locaux et des jobs longs. Aucun compte cloud, téléchargement de poids, entraînement ou coût distant n’est engagé par la découverte. Les budgets déclarés ne plafonnent pas la facturation fournisseur. Les secrets des appels SDK passent uniquement en mémoire dans un canal stdin privé ; cela ne constitue pas une isolation contre du code exécuté sous le même compte système.
+
 ## Boucle automatique dans le checkout de développement
 
 `ai_lab_mission` propose `autoplan`, `autostart`, `autoreport` et `lessons`. À partir de la tâche, de l'objectif, du modèle et du jeu local, le planificateur choisit des essais compatibles, explicite ses valeurs par défaut et réutilise les résultats correspondant au même contexte. `autostart` lance la campagne bornée ; `autoreport` vérifie le job local avant de retenir les leçons. L'exploration reste en développement lorsqu'il manque un contrat de qualification. Les seuils fournis sont conservés.
@@ -49,7 +57,7 @@ Le contrôleur 1.0 utilise **MLX sur Apple Silicon**, une requête à la fois, a
 
 ## Opérations et suivi des entraînements
 
-`hermes ai-lab operations` ou `ailab operations` expose les **21 opérations nommées**, leurs paramètres et leurs prérequis. Elles couvrent Hugging Face, MLX, llama.cpp, TRL/PEFT, Unsloth, LLaMA-Factory, NeMo, lm-eval, l’export de sessions Hermes et les transferts HF/GCS/S3. L’accès à une opération dépend du moteur, de ses dépendances et des connexions configurées. L’exécution sur NVIDIA et chez les fournisseurs de calcul distants reste à vérifier sur les environnements cibles. [Contrats des connecteurs](docs/provider-adapters.md)
+`hermes ai-lab operations` ou `ailab operations` expose les **21 opérations nommées**, leurs paramètres et leurs prérequis. Elles couvrent Hugging Face, MLX, llama.cpp, TRL/PEFT, Unsloth, LLaMA-Factory, NeMo, lm-eval, l’export de sessions Hermes et les transferts HF/S3. L’accès à une opération dépend du moteur, de ses dépendances et des connexions configurées. L’exécution sur NVIDIA et chez les fournisseurs de calcul distants reste à vérifier sur les environnements cibles. [Contrats des connecteurs](docs/provider-adapters.md)
 
 Pour `mlx.train`, fournir le modèle, le dossier de données et un nouveau dossier de sortie sous le workspace. `steps_per_report`, `steps_per_eval` et `save_every` règlent la fréquence des pertes d’entraînement, des pertes de validation et des checkpoints. Le CLI MLX-LM utilise ses propres fréquences si ces paramètres sont omis.
 
@@ -66,11 +74,11 @@ Les points de contrôle sont numérotés. Le job vérifie la présence des fichi
 Installer le wheel avec Python 3.9 ou plus récent, dans un environnement dédié. Le stockage reste extérieur au paquet. Avec un profil Hermes configuré il se trouve sous `ai-lab/` dans ce profil, et en mode standalone neuf sous le répertoire de données utilisateur `hermes-ai-lab`.
 
 ```sh
-python3 -m pip install /chemin/hermes_ai_lab-1.0.0-py3-none-any.whl
+python3 -m pip install /chemin/hermes_ai_lab-1.1.0-py3-none-any.whl
 ailab setup --check
 ailab operations
 ```
 
-L’extra `mcp` fournit le SDK pour `ailab mcp`. L’extra `providers` fournit les SDK des connecteurs correspondants. `ailab api --port 8765` ouvre une API d’outils sur `127.0.0.1` et indique le chemin du fichier de jeton. `GET /health` donne l’état du service. `GET /tools` et `POST /tools/call` exigent le jeton Bearer. Un appel contient `name` et `arguments`, par exemple `{"name":"ai_lab_operations","arguments":{}}`. Cette interface sert au dispatch des outils AI Lab. Les clients OpenAI Chat Completions utilisent un autre contrat.
+L’extra `mcp` fournit le SDK pour `ailab mcp`. L’extra `providers` fournit les SDK des connecteurs correspondants. `ailab api --port 8765` ouvre une API d’outils sur `127.0.0.1`, protégée par `AI_LAB_HTTP_API_KEY` configurée dans Hermes (au moins 32 caractères). Aucun fichier de jeton n’est créé ni lu. Sans le runtime Hermes et un accès déclaré, les opérations authentifiées échouent explicitement. `GET /health` donne l’état du service. `GET /tools` et `POST /tools/call` exigent le jeton Bearer. Un appel contient `name` et `arguments`, par exemple `{"name":"ai_lab_operations","arguments":{}}`. Cette interface sert au dispatch des outils AI Lab. Les clients OpenAI Chat Completions utilisent un autre contrat.
 
 Pour les résultats datés, les artefacts de livraison et les limites de vérification, consulter le [rapport 1.0](docs/releases/2026-11-11-v1.md), [STATUS.md](STATUS.md) et le [contrat de livraison](docs/RELEASE-CONTRACT.md).

@@ -17,7 +17,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .credentials import CredentialError, resolve_secret, validate_reference
+from .credentials import CredentialError, resolve_secret, secret_scope
+from .process_env import runtime_env
 
 MAX_BYTES = 2 * 1024 * 1024
 TIMEOUT = 10
@@ -26,6 +27,11 @@ _FIELDS = {"id", "type", "base_url", "project", "bucket", "credential_ref", "pyt
 _SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z")
 _BASES = {"runpod": "https://api.runpod.io/v2", "hf_jobs": "https://huggingface.co",
           "hf_endpoints": "https://huggingface.co", "hf_storage": "https://huggingface.co"}
+_KEY_NAMES = {"runpod": "AI_LAB_RUNPOD_API_KEY", "hf_jobs": "AI_LAB_HF_TOKEN",
+              "hf_endpoints": "AI_LAB_HF_TOKEN", "hf_storage": "AI_LAB_HF_TOKEN",
+              "s3": "AI_LAB_S3_ACCESS_KEY_ID"}
+_S3_SECRET = "AI_LAB_S3_SECRET_ACCESS_KEY"
+_S3_SESSION = "AI_LAB_S3_SESSION_TOKEN"
 
 # Public discovery schema. Each action accepts exactly the documented fields.
 ACTION_SCHEMAS = {
@@ -44,6 +50,7 @@ for _kind in ("hf_storage", "gcs", "s3"):
     ACTION_SCHEMAS[_kind] = {"probe": {}, "list": {"prefix": "string", "limit": "1..100"},
                              "upload": {"local_path": "workspace-relative file", "key": "relative object path"},
                              "get": {"key": "relative object path"}}
+del ACTION_SCHEMAS["gcs"]["upload"]
 
 
 def failure(code, message):
@@ -72,14 +79,15 @@ def validate_connection(c: dict) -> dict:
         return failure("invalid_config", "Provider configuration fields must be bounded strings.")
     if c.get("base_url") and c["base_url"].rstrip("/") != _BASES.get(kind):
         return failure("invalid_config", "Provider URL is not an allowed service endpoint.")
-    if "credential_ref" in c and not validate_reference(c["credential_ref"], allow_native=kind != "runpod"):
-        return failure("invalid_config", "Invalid credential reference.")
-    if kind in {"gcs", "s3"} and c.get("credential_ref", "native") != "native":
-        return failure("invalid_config", "Object storage uses native SDK credentials in this adapter.")
-    if kind.startswith("hf_") and not c.get("credential_ref"):
-        return failure("configuration_required", "Configure an explicit credential reference or native HF authentication.")
-    if kind == "runpod" and not c.get("credential_ref"):
-        return failure("configuration_required", "Configure a Runpod credential reference.")
+    if kind == "gcs":
+        if "credential_ref" in c:
+            return failure("invalid_config", "Google Cloud Storage uses the plugin's Hermes Google sign-in.")
+    else:
+        expected_ref = "hermes:" + _KEY_NAMES[kind]
+        if "credential_ref" not in c:
+            return failure("configuration_required", f"Configure the provider credential reference {expected_ref}.")
+        if c["credential_ref"] != expected_ref:
+            return failure("invalid_config", f"Use the provider credential reference {expected_ref}.")
     if kind in {"hf_jobs", "hf_endpoints", "gcs"} and not _slug(c.get("project")):
         return failure("configuration_required", "Configure the provider namespace or project.")
     if kind in {"gcs", "s3"} and not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", c.get("bucket", "")):
@@ -158,7 +166,7 @@ def _selected(obj, fields):
             value = value.value
         if isinstance(value, str):
             # Metadata is bounded; URL-looking strings are never returned.
-            result[name] = value[:200] if "://" not in value and "?" not in value else "[withheld]"
+            result[name] = value if len(value) <= 200 and "://" not in value and "?" not in value else "[withheld]"
         elif value is None or isinstance(value, (bool, int)):
             result[name] = value
         elif isinstance(value, float) and math.isfinite(value):
@@ -299,8 +307,8 @@ def _runpod(c, action, p):
     return _safe_output(result, (token,))
 
 
-def _guard_hf_http(kind, create=False):
-    """SDK v1+ clients confined to this child process, without redirects/proxy/retries."""
+def _guard_hf_http(kind, create=False, transfer=False):
+    """Constrain the isolated SDK client and remove bearer headers from transfer hosts."""
     import httpx
     import huggingface_hub
     if not hasattr(huggingface_hub, "set_client_factory"):
@@ -314,23 +322,23 @@ def _guard_hf_http(kind, create=False):
             allowed = allowed or host.endswith(".hf.co") or host.endswith(".huggingface.co")
         if request.url.scheme != "https" or request.url.port not in (None, 443) or request.url.userinfo or not allowed:
             raise _AdapterError("destination_refused")
+        if kind == "hf_storage" and host != "huggingface.co":
+            request.headers.pop("Authorization", None)
         if create and request.method == "POST":
             writes += 1
             if writes > 1:
                 raise _AdapterError("reconciliation_required")
     def reject_redirect(response):
-        if 300 <= response.status_code < 400:
+        if not transfer and 300 <= response.status_code < 400:
             raise _AdapterError("redirect_refused")
     huggingface_hub.set_client_factory(lambda: httpx.Client(timeout=TIMEOUT, follow_redirects=False, trust_env=False,
                                                              event_hooks={"request": [guard], "response": [reject_redirect]}))
 
 
 def _hf_operation(c, action, p):
-    from huggingface_hub import HfApi, get_token
+    from huggingface_hub import HfApi
     kind = c["type"]
-    token = get_token() if c.get("credential_ref") == "native" else resolve_secret(c["credential_ref"])
-    if not token:
-        raise CredentialError("Credential unavailable.")
+    token = resolve_secret(c["credential_ref"])
     _guard_hf_http(kind, action == "create")
     api = HfApi(endpoint="https://huggingface.co", token=token)
     namespace = c.get("project")
@@ -390,43 +398,88 @@ def _job(item):
     return result
 
 
-def _storage_operation(c, action, p):
-    kind = c["type"]
-    bucket_name = c["bucket"]
-    if kind == "gcs":
-        from google.cloud import storage
-        client = storage.Client(project=c["project"])
-        # Restrict the authenticated storage session; SDK-native credential refresh remains SDK-managed.
-        request = client._http.request
-        def bounded(method, url, **kwargs):
-            parsed = urllib.parse.urlsplit(url)
-            if parsed.scheme != "https" or parsed.netloc != "storage.googleapis.com":
-                raise _AdapterError("destination_refused")
-            kwargs.update(timeout=TIMEOUT, allow_redirects=False)
-            return request(method, url, **kwargs)
-        client._http.request = bounded
-        bucket = client.bucket(bucket_name)
-        if action == "probe":
-            bucket.reload(timeout=TIMEOUT, retry=None)
-            return {"ok": True, "bucket_verified": True}
-        if action == "list":
-            items = list(client.list_blobs(bucket_name, prefix=p.get("prefix", ""), max_results=p.get("limit", 100) + 1, timeout=TIMEOUT, retry=None))
-            return {"ok": True, "objects": [_selected(x, ("name", "size", "generation")) for x in items[:p.get("limit", 100)]], "is_truncated": len(items) > p.get("limit", 100)}
-        blob = bucket.blob(p["key"])
-        if action == "upload":
-            blob.upload_from_filename(p["local_path"], timeout=TIMEOUT, retry=None, if_generation_match=0)
-        else:
-            blob.reload(timeout=TIMEOUT, retry=None)
-        return {"ok": True, "object": _selected(blob, ("name", "size", "generation")), "uploaded": action == "upload"}
+def _gcs_operation(c, action, p):
+    from hermes_cli.plugin_provider_requests import ProviderNotSignedIn, credentialed_provider_request
+
+    url = "https://storage.googleapis.com/storage/v1/b/" + urllib.parse.quote(c["bucket"], safe="")
+    object_fields = "name,size,generation"
+    limit = p.get("limit", 100)
+    if action == "list":
+        url += "/o?" + urllib.parse.urlencode({"prefix": p.get("prefix", ""), "maxResults": limit,
+                                             "fields": "items(" + object_fields + "),nextPageToken"})
+    elif action == "get":
+        url += "/o/" + urllib.parse.quote(p["key"], safe="") + "?" + urllib.parse.urlencode({"fields": object_fields})
+    else:
+        url += "?fields=name"
+    try:
+        response = credentialed_provider_request("google", "GET", url, timeout=TIMEOUT)
+    except (ProviderNotSignedIn, PermissionError):
+        raise CredentialError("Hermes Google sign-in is unavailable.") from None
+    if response.status != 200:
+        code = {401: "auth_required", 403: "forbidden", 404: "not_found", 429: "rate_limited"}
+        raise _AdapterError("redirect_refused" if 300 <= response.status < 400 else code.get(response.status, "provider_error"))
+    if len(response.body) > MAX_BYTES:
+        raise _AdapterError("response_too_large")
+    data = response.json()
+    if not isinstance(data, dict):
+        raise _AdapterError("invalid_response")
+    if action == "probe":
+        if data.get("name") != c["bucket"]:
+            raise _AdapterError("invalid_response")
+        return {"ok": True, "bucket_verified": True}
+    if action == "list":
+        items = data.get("items", [])
+        if not isinstance(items, list):
+            raise _AdapterError("invalid_response")
+        return {"ok": True, "objects": [_gcs_object(item) for item in items[:limit]],
+                "is_truncated": bool(data.get("nextPageToken")) or len(items) > limit}
+    return {"ok": True, "object": _gcs_object(data), "uploaded": False}
+
+
+def _gcs_object(item):
+    if not isinstance(item, dict):
+        raise _AdapterError("invalid_response")
+    result = _selected(item, ("name", "size", "generation"))
+    for name in ("size", "generation"):
+        value = result.get(name)
+        if isinstance(value, str) and value.isascii() and value.isdecimal() and len(value) <= 20:
+            result[name] = int(value)
+    return result
+
+
+def _provider_secrets(c):
+    name = _KEY_NAMES[c["type"]]
+    values = {name: resolve_secret("hermes:" + name)}
+    if c["type"] == "s3":
+        values[_S3_SECRET] = resolve_secret("hermes:" + _S3_SECRET)
+        try:
+            values[_S3_SESSION] = resolve_secret("hermes:" + _S3_SESSION)
+        except CredentialError:
+            pass
+    return values
+
+
+def _s3_client(c):
     import boto3
     from botocore.config import Config
+    keys = _provider_secrets(c)
+    bucket_name = c["bucket"]
     client = boto3.client("s3", region_name=c["region"], endpoint_url=f"https://s3.{c['region']}.amazonaws.com",
+                          aws_access_key_id=keys[_KEY_NAMES["s3"]], aws_secret_access_key=keys[_S3_SECRET],
+                          aws_session_token=keys.get(_S3_SESSION),
                           config=Config(connect_timeout=TIMEOUT, read_timeout=TIMEOUT, retries={"total_max_attempts": 1}, proxies={}))
     def guard(request, **kwargs):
         parsed = urllib.parse.urlsplit(request.url)
-        if parsed.scheme != "https" or not (parsed.hostname == f"s3.{c['region']}.amazonaws.com" or parsed.hostname == f"{bucket_name}.s3.{c['region']}.amazonaws.com"):
+        regional = f"s3.{c['region']}.amazonaws.com"
+        if parsed.scheme != "https" or parsed.netloc not in {regional, f"{bucket_name}.{regional}"}:
             raise _AdapterError("destination_refused")
     client.meta.events.register("before-send.s3", guard)
+    return client
+
+
+def _storage_operation(c, action, p):
+    client = _s3_client(c)
+    bucket_name = c["bucket"]
     if action == "probe":
         client.head_bucket(Bucket=bucket_name)
         return {"ok": True, "bucket_verified": True}
@@ -447,11 +500,20 @@ def _storage_operation(c, action, p):
 
 def _sdk_worker(payload):
     """Child entry: exceptions/logs never leave this boundary."""
-    c, action, p = payload["connection"], payload["action"], payload["params"]
     try:
-        if c["type"].startswith("hf_"):
-            return _hf_operation(c, action, p)
-        return _storage_operation(c, action, p)
+        c, action, p = payload["connection"], payload["action"], payload["params"]
+        values = payload["secrets"]
+        with secret_scope(values):
+            if action in {"storage.download", "storage.upload"}:
+                from .transfer_task import execute_transfer
+                result = execute_transfer(action, c, **p)
+            elif c["type"].startswith("hf_"):
+                result = _hf_operation(c, action, p)
+            elif c["type"] == "s3":
+                result = _storage_operation(c, action, p)
+            else:
+                raise _AdapterError("unsupported_transport")
+            return _safe_output(result, values.values())
     except ImportError:
         return failure("dependency_missing", "Install the optional provider SDK in the configured Python environment.")
     except CredentialError:
@@ -462,36 +524,45 @@ def _sdk_worker(payload):
         return failure("provider_error", "The provider rejected or could not complete this operation.")
 
 
-_SDK_CODE = '''import contextlib,json,os,sys
+_SDK_CODE = '''import json,os,sys
+output=os.fdopen(os.dup(sys.stdout.fileno()),"w",encoding="utf-8")
+with open(os.devnull,"wb") as sink:
+    os.dup2(sink.fileno(),sys.stdout.fileno())
+    os.dup2(sink.fileno(),sys.stderr.fileno())
 sys.path.insert(0,sys.argv[1])
-from ai_lab_core.providers import _sdk_worker
-payload=json.load(sys.stdin)
-with open(os.devnull,"w") as sink, contextlib.redirect_stdout(sink),contextlib.redirect_stderr(sink):
-    result=_sdk_worker(payload)
-print(json.dumps(result,allow_nan=False))
+from ai_lab_core.providers import MAX_BYTES,_sdk_worker
+raw=sys.stdin.buffer.read(MAX_BYTES+1)
+if len(raw)>MAX_BYTES:
+    sys.exit(2)
+result=json.dumps(_sdk_worker(json.loads(raw)),allow_nan=False)
+if len(result.encode("utf-8"))>MAX_BYTES:
+    sys.exit(2)
+with output:
+    output.write(result)
 '''
 
 
-def _sdk_call(c, action, p):
+def _sdk_call(c, action, p, *, values=None, timeout=None):
     # Use an isolated SDK process so client policies do not mutate Hermes/global SDK state.
-    env = os.environ.copy()
-    env["HF_HUB_DISABLE_XET"] = "1"
-    env["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-    env["HF_HUB_DISABLE_TELEMETRY"] = "1"
-    for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy", "HF_ENDPOINT", "AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "STORAGE_EMULATOR_HOST", "PYTHONPATH", "PYTHONHOME"):
-        env.pop(key, None)
-    with tempfile.TemporaryFile() as output:
-        result = subprocess.run([c.get("python", sys.executable), "-I", "-c", _SDK_CODE, str(Path(__file__).resolve().parents[1])],
-                                input=json.dumps({"connection": c, "action": action, "params": p}).encode(),
-                                stdout=output, stderr=subprocess.DEVNULL, timeout=45 if action != "upload" else 300,
-                                cwd=str(Path(__file__).resolve().parents[1]), env=env, check=False)
-        if result.returncode or output.tell() > MAX_BYTES:
-            raise _AdapterError("provider_error")
-        output.seek(0)
-        data = json.load(output)
+    if values is None:
+        values = _provider_secrets(c)
+    payload = json.dumps({"connection": c, "action": action, "params": p, "secrets": values}).encode()
+    if len(payload) > MAX_BYTES:
+        raise _AdapterError("invalid_input")
+    root = str(Path(__file__).resolve().parents[1])
+    with tempfile.TemporaryDirectory(prefix="ai-lab-sdk-") as home:
+        env = runtime_env({"HF_HUB_OFFLINE": "0"})
+        env.update(HOME=home, AWS_EC2_METADATA_DISABLED="true")
+        result = subprocess.run([c.get("python", sys.executable), "-I", "-c", _SDK_CODE, root],
+                                input=payload, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                timeout=timeout or (300 if action == "upload" else 45), cwd=root,
+                                env=env, check=False)
+    if result.returncode or len(result.stdout) > MAX_BYTES:
+        raise _AdapterError("provider_error")
+    data = json.loads(result.stdout)
     if not isinstance(data, dict) or not isinstance(data.get("ok"), bool):
         raise _AdapterError("invalid_response")
-    return data
+    return _safe_output(data, values.values())
 
 
 def probe_connection(c: dict) -> dict:
@@ -503,6 +574,8 @@ def provider_action(c: dict, action: str, params: dict) -> dict:
     if not checked["ok"]:
         return checked
     kind = c["type"]
+    if kind == "gcs" and action == "upload":
+        return failure("unsupported_transport", "Hermes Google sign-in supports bounded metadata requests in AI Lab.")
     if not isinstance(action, str) or action not in ACTION_SCHEMAS[kind] or not isinstance(params, dict):
         return failure("invalid_input", "Unknown provider action or invalid parameters.")
     schema = ACTION_SCHEMAS[kind][action]
@@ -524,13 +597,17 @@ def provider_action(c: dict, action: str, params: dict) -> dict:
                 p["local_path"] = _artifact(c, p.get("local_path"))
         if kind == "runpod":
             result = _runpod(c, action, p)
+        elif kind == "gcs":
+            result = _gcs_operation(c, action, p)
         else:
             intent = None
             if action == "create":
                 config = _create_config(kind, p.get("config"), p.get("timeout_seconds"))
+                values = _provider_secrets(c)
                 intent = _intent(c, p)
-                p = {"config": config}
-            result = _sdk_call(c, action, p)
+                result = _sdk_call(c, action, {"config": config}, values=values)
+            else:
+                result = _sdk_call(c, action, p)
             if intent and result.get("ok"):
                 resource = result.get("resource", {})
                 _finish_intent(intent, resource.get("id", resource.get("name")))
@@ -539,6 +616,8 @@ def provider_action(c: dict, action: str, params: dict) -> dict:
         return result | {"connection_id": c["id"], "type": kind, "actions": ACTION_SCHEMAS[kind]}
     except CredentialError:
         return failure("credential_unavailable", "The configured credential could not be used.")
+    except ImportError:
+        return failure("dependency_missing", "This provider requires a compatible Hermes version or optional SDK.")
     except _AdapterError as exc:
         return failure(exc.code, "The provider operation could not be completed; inspect selected resource state before retrying a creation.")
     except subprocess.TimeoutExpired:

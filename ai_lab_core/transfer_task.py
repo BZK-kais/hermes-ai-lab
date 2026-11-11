@@ -1,6 +1,5 @@
 """Optional SDK transfer worker. Artifact bytes and credentials never enter results."""
 from __future__ import annotations
-import argparse
 import contextlib
 import json
 import os
@@ -12,7 +11,7 @@ import tempfile
 if __package__ in (None,''):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from ai_lab_core.credentials import CredentialError,resolve_secret
-from ai_lab_core.providers import validate_connection
+from ai_lab_core.providers import _guard_hf_http, _s3_client, validate_connection
 from ai_lab_core.transfers import HARD_MAX_BYTES,valid_key,local_file,failure
 
 
@@ -36,21 +35,12 @@ def _size(value,cap):
     return value
 
 
-def _hf_token(c):
-    if c.get('credential_ref') == 'native':
-        from huggingface_hub import get_token
-        token = get_token()
-        if not token:
-            raise CredentialError('Credential unavailable.')
-        return token
-    return resolve_secret(c['credential_ref'])
-
-
 def _transport(c,key,local,download,cap,scratch):
     kind = c['type']
     if kind == 'hf_storage':
         from huggingface_hub import HfApi,hf_hub_download
-        token = _hf_token(c)
+        token = resolve_secret(c['credential_ref'])
+        _guard_hf_http(kind, transfer=True)
         api = HfApi(token=token)
         if download:
             revision = api.model_info(c['repo_id']).sha
@@ -66,19 +56,8 @@ def _transport(c,key,local,download,cap,scratch):
             return expected
         api.upload_file(path_or_fileobj=str(local),path_in_repo=key,repo_id=c['repo_id'],repo_type='model',token=token)
         return local.stat().st_size
-    if kind == 'gcs':
-        from google.cloud import storage
-        blob = storage.Client(project=c['project']).bucket(c['bucket']).blob(key)
-        if download:
-            blob.reload(timeout=60)
-            expected = _size(blob.size,cap)
-            blob.download_to_filename(str(local),timeout=120,if_generation_match=blob.generation)
-            return expected
-        blob.upload_from_filename(str(local),timeout=120)
-        return local.stat().st_size
     if kind == 's3':
-        import boto3
-        client = boto3.client('s3',region_name=c['region'])
+        client = _s3_client(c)
         if download:
             head = client.head_object(Bucket=c['bucket'],Key=key)
             expected = _size(head.get('ContentLength'),cap)
@@ -96,7 +75,9 @@ def execute_transfer(operation,connection,key,local_path,workspace_root,max_byte
     validation = validate_connection(connection)
     if not validation.get('ok'):
         return validation
-    if connection.get('type') not in ('hf_storage','gcs','s3'):
+    if connection['type'] == 'gcs':
+        return failure('unsupported_transport','Hermes Google sign-in supports bounded metadata requests in AI Lab.')
+    if connection['type'] not in ('hf_storage','s3'):
         return failure('invalid_config','A storage connection is required.')
     if isinstance(max_bytes,bool) or not isinstance(max_bytes,int) or not 1 <= max_bytes <= HARD_MAX_BYTES:
         return failure('invalid_parameters','Transfer size limit is invalid.')
@@ -153,22 +134,8 @@ def execute_transfer(operation,connection,key,local_path,workspace_root,max_byte
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('operation',choices=['storage.download','storage.upload'])
-    parser.add_argument('--connection-json',required=True)
-    parser.add_argument('--key',required=True)
-    parser.add_argument('--local-path',required=True)
-    parser.add_argument('--workspace-root',required=True)
-    parser.add_argument('--max-bytes',required=True,type=int)
-    args=parser.parse_args()
-    try:
-        connection=json.loads(args.connection_json)
-    except (ValueError,TypeError):
-        result=failure('invalid_config','Storage configuration is invalid.')
-    else:
-        result=execute_transfer(args.operation,connection,args.key,args.local_path,args.workspace_root,args.max_bytes)
-    print(json.dumps(result))
-    return 0 if result.get('ok') else 1
+    print(json.dumps(failure('credential_unavailable','Run storage transfers from a live Hermes request.')))
+    return 1
 
 
 if __name__=='__main__':

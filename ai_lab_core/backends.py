@@ -1,6 +1,8 @@
 """CLI planning adapters. Planning performs no download, conversion or training."""
 from __future__ import annotations
 
+from .process_env import runtime_env
+
 import os
 import re
 import shutil
@@ -102,7 +104,7 @@ def _python_has(python, modules):
     try:
         result = subprocess.run([python, '-I', '-c',
             'import importlib.util,sys; sys.exit(0 if all(importlib.util.find_spec(x) is not None for x in sys.argv[1:]) else 1)',
-            *modules], capture_output=True, timeout=3)
+            *modules], capture_output=True, timeout=3, env=runtime_env())
         return result.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -341,6 +343,6 @@ def plan_operation(operation: str, params: dict, settings: dict) -> dict:
                 'outputs':outputs,'metadata':metadata,
                 'env':{'HF_HUB_DISABLE_IMPLICIT_TOKEN':'1','WANDB_MODE':'disabled',
                        **({'PYTHONUNBUFFERED':'1'} if operation == 'mlx.train' else {}),
-                       **({} if operation == 'hf.download' else {'HF_HUB_OFFLINE':'1','HF_DATASETS_OFFLINE':'1'})}}}
+                       **({'HF_HUB_OFFLINE':'0'} if operation == 'hf.download' else {'HF_HUB_OFFLINE':'1','HF_DATASETS_OFFLINE':'1'})}}}
     except (ValueError, TypeError, OSError, RuntimeError, _Invalid):
         return _error('invalid_parameters','Operation parameters or paths are invalid.')

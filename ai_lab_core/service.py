@@ -96,7 +96,8 @@ def run(operation, parameters):
     from .jobs import submit
     settings = load_integrations()
     if operation in {"storage.download", "storage.upload"}:
-        from .transfers import plan_operation
+        from .transfers import run_transfer
+        return run_transfer(operation, parameters, settings)
     result = plan_operation(operation, parameters, settings)
     if not result.get("ok"):
         return result

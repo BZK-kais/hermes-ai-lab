@@ -1,73 +1,79 @@
-"""Runtime-only secret resolution. Never include resolved values in tool results."""
+"""Resolve credentials inside Hermes or an isolated SDK child."""
 from __future__ import annotations
 
-import os
-from pathlib import Path
-import re
-import subprocess
+from collections.abc import Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 MAX_SECRET_BYTES = 16384
-_ENV = re.compile(r"env:[A-Za-z_][A-Za-z0-9_]{0,127}\Z")
-_GCP = re.compile(r"gcp:projects/[A-Za-z0-9_.:-]+/secrets/[A-Za-z0-9_-]+/versions/(?:latest|[0-9]+)\Z")
+SECRET_NAMES = frozenset({
+    "AI_LAB_RUNPOD_API_KEY",
+    "AI_LAB_HF_TOKEN",
+    "AI_LAB_INFERENCE_API_KEY",
+    "AI_LAB_MCP_API_KEY",
+    "AI_LAB_HTTP_API_KEY",
+    "AI_LAB_S3_ACCESS_KEY_ID",
+    "AI_LAB_S3_SECRET_ACCESS_KEY",
+    "AI_LAB_S3_SESSION_TOKEN",
+})
+_CHILD_SECRETS = ContextVar("ai_lab_child_secrets", default=None)
 
 
 class CredentialError(Exception):
-    """Safe static error; never wraps the underlying exception."""
+    """Safe static error for an invalid or unavailable credential."""
 
 
-def validate_reference(reference: object, *, allow_native: bool = True) -> bool:
-    if reference == "native":
-        return allow_native
-    if not isinstance(reference, str) or len(reference) > 1024:
-        return False
-    if _ENV.fullmatch(reference) or _GCP.fullmatch(reference):
-        return True
-    if reference.startswith("file:"):
-        path = reference[5:]
-        return bool(path) and Path(path).is_absolute() and not any(ord(c) < 32 for c in path)
-    return False
+def validate_reference(reference: object, *, allow_native: bool = False) -> bool:
+    return (
+        isinstance(reference, str)
+        and len(reference) <= 64
+        and reference.startswith("hermes:")
+        and reference[7:] in SECRET_NAMES
+    )
 
 
 def _validate_secret(value: object) -> str:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or len(value) > MAX_SECRET_BYTES or not value.isprintable():
         raise CredentialError("Credential unavailable.")
     value = value.strip()
-    if not value or len(value.encode()) > MAX_SECRET_BYTES or any(ord(c) < 32 or ord(c) == 127 for c in value):
-        raise CredentialError("Credential unavailable.")
-    return value
+    try:
+        if value and len(value.encode("utf-8")) <= MAX_SECRET_BYTES:
+            return value
+    except UnicodeError:
+        pass
+    raise CredentialError("Credential unavailable.")
+
+
+@contextmanager
+def secret_scope(values: Mapping[str, str]):
+    """Scope a one-shot IPC payload inside a trusted child process."""
+    if not isinstance(values, Mapping) or not values.keys() <= SECRET_NAMES:
+        raise CredentialError("Credential reference is invalid.")
+    scoped = {name: _validate_secret(value) for name, value in values.items()}
+    token = _CHILD_SECRETS.set(scoped)
+    try:
+        yield
+    finally:
+        _CHILD_SECRETS.reset(token)
+        scoped.clear()
 
 
 def resolve_secret(reference: str) -> str:
-    """Internal API. Call only inside an adapter runtime, never expose as a tool."""
-    if not validate_reference(reference, allow_native=False):
+    """Resolve an allowlisted reference using the current Hermes profile."""
+    if not validate_reference(reference):
         raise CredentialError("Credential reference is invalid.")
+    name = reference[7:]
+    scoped = _CHILD_SECRETS.get()
+    if scoped is not None:
+        return _validate_secret(scoped.get(name))
     try:
-        if reference.startswith("env:"):
-            return _validate_secret(os.environ.get(reference[4:]))
-        if reference.startswith("file:"):
-            # Explicit file only: never enumerate a directory or credential store.
-            with Path(reference[5:]).open("rb") as handle:
-                raw = handle.read(MAX_SECRET_BYTES + 1)
-            if len(raw) > MAX_SECRET_BYTES:
-                raise CredentialError("Credential unavailable.")
-            return _validate_secret(raw.decode("utf-8"))
-        resource = reference[4:]
-        project, secret, version = resource.split("/")[1::2]
-        result = subprocess.run(
-            ["gcloud", "secrets", "versions", "access", version, "--secret", secret,
-             "--project", project, "--quiet"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            timeout=15, check=False,
-        )
-        if result.returncode or len(result.stdout) > MAX_SECRET_BYTES:
-            raise CredentialError("Credential unavailable.")
-        return _validate_secret(result.stdout.decode("utf-8"))
-    except CredentialError:
-        raise
+        from agent.secret_scope import get_secret
+
+        return _validate_secret(get_secret(name))
     except Exception:
         raise CredentialError("Credential unavailable.") from None
 
 
 def resolve_credential(reference: str) -> str:
-    """Compatibility name for trusted adapter runtimes; not a public tool."""
+    """Compatibility name for trusted adapter runtimes."""
     return resolve_secret(reference)

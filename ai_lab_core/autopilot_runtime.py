@@ -46,9 +46,10 @@ def fingerprint(runtime, hardware, sources):
 
 
 def probe(python, hardware):
+    from .process_env import runtime_env
     command = [str(python), "-I", "-B", str(Path(__file__).resolve())]
     try:
-        result = subprocess.run(command, capture_output=True, timeout=5, check=True)
+        result = subprocess.run(command, capture_output=True, timeout=5, check=True, env=runtime_env())
         if len(result.stdout) > 16_384:
             return None
         runtime = json.loads(result.stdout)

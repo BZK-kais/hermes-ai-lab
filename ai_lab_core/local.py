@@ -1,6 +1,8 @@
 """Bounded, read-only discovery of local hardware, tools and model artifacts."""
 from __future__ import annotations
 
+from .process_env import runtime_env
+
 import json
 import os
 import platform
@@ -14,7 +16,7 @@ from pathlib import Path
 def _run(args: list[str], include_stderr: bool = False) -> str:
     try:
         result = subprocess.run(args, capture_output=True, text=True, timeout=3,
-                                env={**os.environ, 'HF_HUB_OFFLINE': '1'})
+                                env=runtime_env())
         return (result.stdout + (result.stderr if include_stderr else ''))[:16384] if result.returncode == 0 else ''
     except (OSError, subprocess.TimeoutExpired, UnicodeError):
         return ''

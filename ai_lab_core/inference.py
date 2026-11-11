@@ -33,7 +33,10 @@ def _credential(connection):
     ref = connection.get("credential_ref")
     if not ref:
         return None
-    from .credentials import resolve_credential
+    from .credentials import resolve_credential, CredentialError
+    expected = 'AI_LAB_MCP_API_KEY' if connection.get('type') in {'mcp', 'unsloth_mcp'} else 'AI_LAB_INFERENCE_API_KEY'
+    if ref != 'hermes:' + expected:
+        raise CredentialError('Use the declared Hermes secret for this connection type.')
     return resolve_credential(ref)
 
 

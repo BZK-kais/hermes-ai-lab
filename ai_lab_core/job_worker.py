@@ -1,7 +1,6 @@
 """Detached POSIX singleton worker. Never signal a PID read from the database."""
 import fcntl
 import hashlib
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,10 +12,14 @@ import subprocess
 import sys
 import time
 
-# Load the sibling helper without relying on the caller's module namespace/cwd.
-_spec = importlib.util.spec_from_file_location('_ai_lab_jobs_worker_helpers', Path(__file__).with_name('jobs.py'))
-_jobs = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_jobs)
+if __package__:
+    from . import jobs as _jobs
+    from .process_env import runtime_env
+else:
+    # The detached launcher uses an isolated interpreter and an absolute script path.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from ai_lab_core import jobs as _jobs
+    from ai_lab_core.process_env import runtime_env
 
 
 def _finish(db, job_id, state, code=None, reason=None, *, plan=None):
@@ -59,39 +62,13 @@ def _kill_owned(proc):
         pass
 
 
-def _output_path_reason(plan, require_absent=False):
-    """Recheck queued output destinations immediately before command launch.
-
-    This closes the serialized-job overwrite case. It is a preflight check,
-    not an atomic filesystem sandbox against changes made during execution.
-    """
-    try:
-        workspace = (Path(plan['_output_workspace']) if '_output_workspace' in plan
-                     else Path(plan['cwd']).resolve(strict=True))
-        if Path(plan['cwd']).resolve(strict=True) != workspace:
-            return 'output_path_invalid'
-        for item in plan['outputs']:
-            path = Path(item['path'])
-            if require_absent and (path.exists() or path.is_symlink()):
-                return 'output_exists'
-            resolved = path.resolve(strict=False)
-            if resolved == workspace:
-                return 'output_path_invalid'
-            try:
-                resolved.relative_to(workspace)
-            except ValueError:
-                return 'output_path_invalid'
-    except (OSError, ValueError, RuntimeError):
-        return 'output_path_invalid'
-    return None
-
-
-
 def _run(root, db, row, resource_fd):
     job_id = row['id']
     plan = json.loads(row['plan'])
+    if _jobs._requires_session(plan):
+        _finish(db, job_id, 'failed', reason='session_required')
+        return
     fd = _jobs._owned_file(root / (job_id + '.log'))
-    secret_values = [v for k, v in {**os.environ, **plan.get('env', {})}.items() if _jobs._SECRET.search(k)]
     proc = None
     deadline = time.monotonic() + plan['timeout_seconds']
     reason = None
@@ -101,11 +78,14 @@ def _run(root, db, row, resource_fd):
         if db.execute('SELECT state FROM jobs WHERE id=?', (job_id,)).fetchone()[0] == 'cancel_requested':
             _finish(db, job_id, 'cancelled', reason='cancelled')
             return
-        output_reason = _output_path_reason(plan, require_absent=True)
+        output_reason = _jobs._output_path_reason(plan, require_absent=True)
         if output_reason:
             _finish(db, job_id, 'failed', reason=output_reason)
             return
-        proc = subprocess.Popen(plan['command'], cwd=plan['cwd'], env={**os.environ, **plan.get('env', {})},
+        overrides = plan.get('env', {})
+        if plan['operation'] == 'hf.download':
+            overrides = {'HF_HUB_OFFLINE': '0', **overrides}
+        proc = subprocess.Popen(plan['command'], cwd=plan['cwd'], env=runtime_env(overrides),
                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 start_new_session=True, close_fds=True, pass_fds=(resource_fd,))
         os.set_blocking(proc.stdout.fileno(), False)
@@ -136,7 +116,7 @@ def _run(root, db, row, resource_fd):
                     eof = True
                     selector.unregister(key.fileobj)
                 else:
-                    safe = _jobs._scrub(data.decode('utf-8', 'replace'), secret_values).encode('utf-8')
+                    safe = _jobs._scrub(data.decode('utf-8', 'replace')).encode('utf-8')
                     os.write(fd, safe)
                     if os.lseek(fd, 0, os.SEEK_CUR) > _jobs._MAX_LOG:
                         os.lseek(fd, -(_jobs._MAX_LOG // 2), os.SEEK_END)
@@ -165,15 +145,15 @@ def _run(root, db, row, resource_fd):
             _finish(db, job_id, 'failed', code, reason)
         elif code != 0:
             received_plan = None
-            if plan['operation'] == 'registry.generate' and not _output_path_reason(plan):
+            if plan['operation'] == 'registry.generate' and not _jobs._output_path_reason(plan):
                 try:
                     received_plan = _report_receipt(plan)
                 except (OSError, ValueError, RuntimeError):
                     pass
             _finish(db, job_id, 'failed', code, 'exit_nonzero', plan=received_plan)
-        elif _output_path_reason(plan):
+        elif _jobs._output_path_reason(plan):
             _finish(db, job_id, 'failed', code, 'output_path_invalid')
-        elif not all((Path(o['path']).is_file() if o['kind'] == 'file' else Path(o['path']).is_dir()) and not Path(o['path']).is_symlink() for o in plan['outputs']):
+        elif not _jobs._outputs_present(plan):
             _finish(db, job_id, 'failed', code, 'outputs_missing')
         else:
             try:

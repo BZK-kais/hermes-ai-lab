@@ -1,5 +1,7 @@
 """Select a PAWS paraphrase adapter on dev and evaluate one frozen candidate."""
 
+from .process_env import runtime_env
+
 import hashlib
 import json
 import math
@@ -177,7 +179,7 @@ def _cpu_result(run, root, split, cases, metadata, cpu_path):
         completed = subprocess.run(
             [str(run.analysis_python), str(CPU_SCRIPT), "--split", split, "--data-dir", str(root),
              "--freeze-path", str(cpu_path)],
-            capture_output=True, timeout=run.remaining(), check=False,
+            capture_output=True, timeout=run.remaining(), check=False, env=runtime_env(),
         )
         if completed.returncode or len(completed.stdout) > 512_000:
             raise ValueError

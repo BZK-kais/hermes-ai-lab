@@ -1,6 +1,8 @@
 """Hardware facts and candidate profiles; no kernel or training qualification."""
 from __future__ import annotations
 
+from .process_env import runtime_env
+
 import csv
 import io
 import platform
@@ -12,7 +14,7 @@ from .local import hardware
 
 def _query(command):
     try:
-        proc = subprocess.run(command, capture_output=True, text=True, timeout=3)
+        proc = subprocess.run(command, capture_output=True, text=True, timeout=3, env=runtime_env())
         return proc.stdout[:16384] if proc.returncode == 0 else ''
     except (OSError, subprocess.TimeoutExpired, UnicodeError):
         return ''

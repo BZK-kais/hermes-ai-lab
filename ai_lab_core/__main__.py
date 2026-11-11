@@ -56,16 +56,17 @@ def main():
     group = generic.add_mutually_exclusive_group()
     group.add_argument('--args'); group.add_argument('--args-file')
     sub.add_parser('mcp')
-    api = sub.add_parser('api'); api.add_argument('--port', type=int, default=8765); api.add_argument('--token-file')
+    api = sub.add_parser('api'); api.add_argument('--port', type=int, default=8765)
     args = parser.parse_args()
     if args.command == 'mcp':
         from .mcp_server import main as serve
         return serve()
     if args.command == 'api':
         from .http_api import main as serve
+        from .credentials import CredentialError
         try:
-            return serve(args.port, args.token_file)
-        except (OSError, ValueError):
+            return serve(args.port)
+        except (OSError, ValueError, CredentialError):
             print(tool_api.encode(tool_api.failure('api_start_failed', 'The local API could not be started.')))
             raise SystemExit(1)
     values = vars(args).copy(); command = values.pop('command')

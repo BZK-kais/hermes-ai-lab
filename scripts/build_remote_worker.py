@@ -98,6 +98,7 @@ def main():
                 result=detect_profile()
             return result,0 if result.get('ok') else 1
         from ai_lab_core.backends import plan_operation
+        from ai_lab_core.process_env import runtime_env
         with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink),contextlib.redirect_stderr(sink):
             planned=plan_operation(request['operation'],request.get('parameters',{}),trusted)
         if not planned.get('ok'):
@@ -108,7 +109,7 @@ def main():
             return fail('reconciliation_required'),2
         # Planner constructs argv and env from allowlisted operations and trusted bindings.
         with open(os.devnull,'wb') as sink:
-            proc=subprocess.Popen(plan['command'],cwd=plan['cwd'],env={**os.environ,**plan.get('env',{})},
+            proc=subprocess.Popen(plan['command'],cwd=plan['cwd'],env=runtime_env(plan.get('env',{})),
                 stdin=subprocess.DEVNULL,stdout=sink,stderr=sink,start_new_session=True)
             def terminate_owned(signum,frame):
                 try: os.killpg(proc.pid,signal.SIGKILL)
