@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "task": {"description": "Répondre aux questions sur des procédures mises à jour chaque semaine et citer les passages utilisés.", "type": "retrieval_qa", "language": "fr", "knowledge_changes": true},
+  "objective": {"primary": "quality", "quality_metric": "answers_correct_with_valid_citations", "quality_min": 0.9},
+  "workload": {"mode": "interactive", "input_tokens_p95": 2500, "output_tokens_p95": 300, "concurrency": 1, "shared_prefix": false},
+  "constraints": {"data_policy": "local_only", "max_p95_latency_ms": 5000},
+  "budget": {"max_trials": 5, "max_wall_seconds": 1800, "max_spend": 0},
+  "evidence": {"baseline_ref": "example:lexical-search-v1", "evaluator_ref": "example:citation-and-answer-grader-v1", "representative_inputs_ref": "example:procedures-reserved-v1", "labeled_examples": 0, "failure_modes": ["stale_citations"], "consumed_holdout": false}
+}

@@ -1,0 +1,38 @@
+{
+  "source": "google-research-datasets/paws",
+  "revision": "161ece9501cf0a11f3e48bd356eaa82de46d6a09",
+  "license_url": "https://raw.githubusercontent.com/google-research-datasets/paws/master/LICENSE",
+  "source_metadata_sha256": {
+    "README.md": "f281c5c5099f08da86c25f83419eedb01eaafaf0bb29b8eb14036249cfc97e89",
+    "LICENSE": "3f2d0f4e3fd88fa1bfeff353754da904c0060ec9d26c9266b8fda73ef98b8a25"
+  },
+  "parquet_sha256": {
+    "labeled_final/train-00000-of-00001.parquet": "8dc9ad3e5f30ad9a86b290fe236d528ef23a5751fec9a35d99cbacf68ba277cf",
+    "labeled_final/validation-00000-of-00001.parquet": "7760d829453764ba342a6f562809a8ed21c2c3eec3fd9ffa544089f145d42f6d",
+    "labeled_final/test-00000-of-00001.parquet": "ae342ff12bb84b84b95f468abf5db6cb7c7bd578271299fe9c99be75b8132f4d"
+  },
+  "sampling_seed": 20261109,
+  "source_splits": {
+    "train": "train",
+    "dev": "validation",
+    "producer": "test",
+    "receiver": "test"
+  },
+  "row_id_format": "paws-{official split}-{official id}",
+  "family": "SHA256 of the smallest normalized sentence in the connected component",
+  "audit": {
+    "source_rows": {
+      "train": 49401,
+      "validation": 8000,
+      "test": 8000
+    },
+    "rejected_source_rows": {},
+    "crossing_source_families": 0,
+    "excluded_crossing_rows": {
+      "train": 0,
+      "validation": 0,
+      "test": 0
+    },
+    "selected_crossing_keys": 0
+  }
+}

@@ -1,0 +1,8 @@
+{"id":"dev-01","family":"fixture-dev-01","slice":"same","input":"{\"case\":\"dev-01\",\"requested_label\":\"same\"}","expected":{"label":"same"}}
+{"id":"dev-02","family":"fixture-dev-02","slice":"different","input":"{\"case\":\"dev-02\",\"requested_label\":\"different\"}","expected":{"label":"different"}}
+{"id":"dev-03","family":"fixture-dev-03","slice":"different","input":"{\"case\":\"dev-03\",\"requested_label\":\"different\"}","expected":{"label":"different"}}
+{"id":"dev-04","family":"fixture-dev-04","slice":"same","input":"{\"case\":\"dev-04\",\"requested_label\":\"same\"}","expected":{"label":"same"}}
+{"id":"dev-05","family":"fixture-dev-05","slice":"different","input":"{\"case\":\"dev-05\",\"requested_label\":\"different\"}","expected":{"label":"different"}}
+{"id":"dev-06","family":"fixture-dev-06","slice":"same","input":"{\"case\":\"dev-06\",\"requested_label\":\"same\"}","expected":{"label":"same"}}
+{"id":"dev-07","family":"fixture-dev-07","slice":"same","input":"{\"case\":\"dev-07\",\"requested_label\":\"same\"}","expected":{"label":"same"}}
+{"id":"dev-08","family":"fixture-dev-08","slice":"different","input":"{\"case\":\"dev-08\",\"requested_label\":\"different\"}","expected":{"label":"different"}}

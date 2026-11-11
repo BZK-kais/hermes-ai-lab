@@ -1,0 +1,39 @@
+{
+  "version": "triage-v1",
+  "language": "fr",
+  "labels": [
+    "bug",
+    "configuration",
+    "demande",
+    "a_clarifier"
+  ],
+  "definitions": {
+    "bug": "Une capacité existante donne un résultat incompatible avec son comportement attendu et suffisamment établi.",
+    "configuration": "Le texte établit qu'un réglage, un droit, une option ou un paramètre d'environnement manque ou cause le symptôme.",
+    "demande": "Le signalement demande une capacité nouvelle et établit que la capacité est actuellement absente.",
+    "a_clarifier": "Le texte ne suffit pas à distinguer les autres classes, présente une intention ambiguë ou ne relève pas du triage technique."
+  },
+  "decision_rules": [
+    "Un réglage causal attesté prime sur la description générique du dysfonctionnement.",
+    "Un réglage seulement soupçonné ne suffit pas à choisir configuration. Classer bug si le comportement cassé reste suffisamment établi, sinon a_clarifier.",
+    "Un souhait de réparer une fonction existante ne suffit pas à classer demande.",
+    "Un constat d'absence de fonction, sans intention d'ajout claire, ne suffit pas à classer demande.",
+    "S'il manque l'action, le comportement attendu ou les éléments permettant de choisir, demander une clarification. Les questions métier sans signalement technique relèvent aussi de a_clarifier."
+  ],
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "enum": ["bug", "configuration", "demande", "a_clarifier"]
+      }
+    },
+    "required": ["label"],
+    "additionalProperties": false
+  },
+  "canonical_outputs": [
+    "{\"label\":\"bug\"}",
+    "{\"label\":\"configuration\"}",
+    "{\"label\":\"demande\"}",
+    "{\"label\":\"a_clarifier\"}"
+  ]
+}

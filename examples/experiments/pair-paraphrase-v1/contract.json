@@ -1,0 +1,35 @@
+{
+  "version": "pair-paraphrase-v1",
+  "language": "en",
+  "labels": [
+    "same",
+    "different"
+  ],
+  "definitions": {
+    "same": "The two sentences convey the same factual meaning.",
+    "different": "One sentence changes, adds or omits a meaningful factual assertion."
+  },
+  "decision_rules": [
+    "Read the inputs as an unordered pair of English sentences.",
+    "Compare who did what to whom and whether quantities, negation, time or place change the meaning."
+  ],
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "label": {
+        "enum": [
+          "same",
+          "different"
+        ]
+      }
+    },
+    "required": [
+      "label"
+    ],
+    "additionalProperties": false
+  },
+  "canonical_outputs": [
+    "{\"label\":\"same\"}",
+    "{\"label\":\"different\"}"
+  ]
+}

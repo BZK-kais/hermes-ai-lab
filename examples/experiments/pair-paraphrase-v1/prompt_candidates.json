@@ -1,0 +1,36 @@
+{
+  "candidates": [
+    {
+      "id": "equivalence",
+      "instructions": "Do these two English sentences state the same facts? Compare who did what to whom, plus quantities, negation, places and time. A change in meaning is different. Return only {\"label\":\"same\"} or {\"label\":\"different\"}.",
+      "fewshots": [
+        {
+          "id": "paws-train-35716",
+          "text": "{\"a\":\"Two guards were wounded and four killed .\",\"b\":\"Two guards were wounded and four were killed .\"}",
+          "label": "same"
+        },
+        {
+          "id": "paws-train-34174",
+          "text": "{\"a\":\"Then Tyrone tells him who Tommy is .\",\"b\":\"Tommy tells him who is Tyrone .\"}",
+          "label": "different"
+        }
+      ]
+    },
+    {
+      "id": "mutual_entailment",
+      "instructions": "Would each sentence be true whenever the other is true, on their ordinary reading? Classify same only when both entail each other. Pay attention to reversals, roles and modifiers. Return only {\"label\":\"same\"} or {\"label\":\"different\"}.",
+      "fewshots": [
+        {
+          "id": "paws-train-2271",
+          "text": "{\"a\":\"One important distinction is clear , though .\",\"b\":\"One important distinction though is clear .\"}",
+          "label": "same"
+        },
+        {
+          "id": "paws-train-15931",
+          "text": "{\"a\":\"Robert 's letter to Sarah is notable .\",\"b\":\"Notable is Sarah 's letter to Robert .\"}",
+          "label": "different"
+        }
+      ]
+    }
+  ]
+}

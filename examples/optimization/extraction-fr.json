@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "task": {"description": "Extraire le montant, la devise et la date de factures en français vers un objet JSON.", "type": "extraction", "language": "fr", "knowledge_changes": false},
+  "objective": {"primary": "quality", "quality_metric": "exactitude_par_document", "quality_min": 0.95},
+  "workload": {"mode": "batch", "input_tokens_p95": 800, "output_tokens_p95": 100, "concurrency": 4, "shared_prefix": true},
+  "constraints": {"data_policy": "local_only"},
+  "budget": {"max_trials": 4, "max_wall_seconds": 1200, "max_spend": 0},
+  "evidence": {"baseline_ref": "example:invoice-parser-v1", "evaluator_ref": "example:invoice-exact-match-v1", "representative_inputs_ref": "example:invoice-reserved-v1", "labeled_examples": 0, "failure_modes": [], "consumed_holdout": false}
+}

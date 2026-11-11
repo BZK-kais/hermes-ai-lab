@@ -1,0 +1,86 @@
+{
+  "source": "google-research-datasets/paws",
+  "revision": "161ece9501cf0a11f3e48bd356eaa82de46d6a09",
+  "license_url": "https://raw.githubusercontent.com/google-research-datasets/paws/master/LICENSE",
+  "dataset": "Public, human-annotated generated sentence pairs derived from Wikipedia (PAWS-Wiki labeled_final).",
+  "customer_data": false,
+  "possible_pretraining_contamination": "unknown",
+  "parquet_sha256": {
+    "labeled_final/train-00000-of-00001.parquet": "8dc9ad3e5f30ad9a86b290fe236d528ef23a5751fec9a35d99cbacf68ba277cf",
+    "labeled_final/validation-00000-of-00001.parquet": "7760d829453764ba342a6f562809a8ed21c2c3eec3fd9ffa544089f145d42f6d",
+    "labeled_final/test-00000-of-00001.parquet": "ae342ff12bb84b84b95f468abf5db6cb7c7bd578271299fe9c99be75b8132f4d"
+  },
+  "sampling_seed": 20261110,
+  "source_splits": {
+    "dev": "validation",
+    "test": "test"
+  },
+  "row_id_format": "paws-{official split}-{official id}",
+  "family": "paws- plus SHA256 of the lexicographically smallest normalized sentence in a connected component built across all three official splits",
+  "normalization": "Unicode NFKC, casefold, replace non-alphanumeric characters with spaces, then collapse and trim whitespace",
+  "sampling": "Exclude components crossing official splits and components in the prior frozen selection. Sort candidate rows by ID before seeded shuffling. Select at most one row per component until each label quota is filled.",
+  "previous_selection": {
+    "dataset": "pair-paraphrase-v1",
+    "sha256": {
+      "train.jsonl": "1e65dc72daafc604429b444dbd6f8088388266b9606831b89ff6a44d927e7328",
+      "dev.jsonl": "96ad4522bd09c69512d47d946b7bdbcdd778fe6be8d29161c0152202b360c0fa",
+      "producer_test.jsonl": "646ea87428ad933e9b08645c02e0f35077217aad7b339e385811f4f80bb3b32b",
+      "receiver_test.jsonl": "fe06efea7242d80a4ab834f204359e164c64392e09dfd69573d7f6558f696b6f"
+    },
+    "row_counts": {
+      "train.jsonl": 1024,
+      "dev.jsonl": 64,
+      "producer_test.jsonl": 128,
+      "receiver_test.jsonl": 128
+    },
+    "families": 1344
+  },
+  "source_audit": {
+    "source_rows": {
+      "train": 49401,
+      "validation": 8000,
+      "test": 8000
+    },
+    "rejected_source_rows": {},
+    "crossing_source_families": 0,
+    "excluded_crossing_rows": {
+      "train": 0,
+      "validation": 0,
+      "test": 0
+    }
+  },
+  "selection_audit": {
+    "dev": {
+      "excluded_prior_family_rows": 470,
+      "excluded_prior_families": 64,
+      "eligible_rows": 7530,
+      "eligible_by_label": {
+        "same": 3310,
+        "different": 4220
+      },
+      "selected_rows": 32,
+      "selected_by_label": {
+        "same": 16,
+        "different": 16
+      }
+    },
+    "test": {
+      "excluded_prior_family_rows": 1842,
+      "excluded_prior_families": 256,
+      "eligible_rows": 6158,
+      "eligible_by_label": {
+        "same": 2737,
+        "different": 3421
+      },
+      "selected_rows": 64,
+      "selected_by_label": {
+        "same": 32,
+        "different": 32
+      }
+    }
+  },
+  "output_sha256": {
+    "dev.jsonl": "5e53884501f2008cfee1f4094ef68460ddfc2ad8bcf7eb802b2c59767fb9ebfb",
+    "test.jsonl": "ff85a612bc684dc128ec4ead0999da88d5e5dbbe229acc0fbf737ea123a8716e"
+  }
+}

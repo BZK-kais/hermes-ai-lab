@@ -1,0 +1,56 @@
+{
+  "candidates": [
+    {
+      "id": "definitions",
+      "instructions": "Classe le signalement technique reçu. Retourne uniquement un objet JSON contenant la clé label et une valeur parmi bug, configuration, demande, a_clarifier. bug : comportement d’une fonction existante qui contredit le résultat attendu. configuration : réglage, autorisation, option ou environnement manquant ou incorrect, établi dans le texte. demande : capacité nouvelle dont le texte établit l’absence. a_clarifier : hors périmètre, intention ambiguë ou faits insuffisants pour choisir.",
+      "fewshots": [
+        {
+          "id": "train-023",
+          "text": "Le sélecteur de semaine démarre au lundi comme prévu, sauf la première semaine de janvier qui mélange deux années dans la même grille.",
+          "label": "bug"
+        },
+        {
+          "id": "train-013",
+          "text": "Les impressions se font sur une face alors que le document est bien prévu pour le recto verso. Le pilote de ce poste a cette option désactivée.",
+          "label": "configuration"
+        },
+        {
+          "id": "train-069",
+          "text": "On peut aujourd'hui commenter une phrase. Je voudrais joindre une note audio à un commentaire, format qui n'est pas accepté.",
+          "label": "demande"
+        },
+        {
+          "id": "train-008",
+          "text": "L'enregistrement était « bizarre » selon l'intervenant. Ni lui ni moi n'avons encore réécouté le fichier.",
+          "label": "a_clarifier"
+        }
+      ]
+    },
+    {
+      "id": "questions",
+      "instructions": "Classe le signalement technique reçu. Retourne uniquement un objet JSON contenant la clé label et une valeur parmi bug, configuration, demande, a_clarifier. Demande-toi quelle action les faits permettent d’engager. Si un paramètre, un droit ou un environnement en cause est identifié, choisir configuration. Si une capacité manque explicitement et qu’il est demandé de l’ajouter, choisir demande. Si une action déjà disponible donne un résultat incompatible avec ce qu’elle annonce, choisir bug. Une cause seulement soupçonnée, un souhait vague ou une décision métier sans signalement technique va dans a_clarifier.",
+      "fewshots": [
+        {
+          "id": "train-034",
+          "text": "Le formulaire confirme que les trois choix ont été enregistrés. La fiche soumise ne contient que le premier lorsque les choix partagent le même début.",
+          "label": "bug"
+        },
+        {
+          "id": "train-003",
+          "text": "Les lieux voisins apparaissent à plusieurs kilomètres. Le fichier a été chargé comme coordonnées nationales alors qu'il est exprimé en degrés.",
+          "label": "configuration"
+        },
+        {
+          "id": "train-068",
+          "text": "J'aimerais réserver des pièces à l'avance pour une intervention. Le produit ne connaît que les entrées et sorties déjà effectuées.",
+          "label": "demande"
+        },
+        {
+          "id": "train-044",
+          "text": "Le moteur est trop agressif. Certains trouvent qu'il corrige trop les mots, d'autres qu'il remonte trop de résultats. On n'a pas d'exemple.",
+          "label": "a_clarifier"
+        }
+      ]
+    }
+  ]
+}

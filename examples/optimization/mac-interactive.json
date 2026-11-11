@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "task": {"description": "Générer des réponses courtes en streaming sur un Mac Apple Silicon pour plusieurs sessions Hermes.", "type": "generation", "language": "fr", "knowledge_changes": false},
+  "objective": {"primary": "latency", "quality_metric": "accepted_response_rate", "quality_min": 0.9},
+  "workload": {"mode": "interactive", "input_tokens_p95": 4096, "output_tokens_p95": 300, "concurrency": 3, "shared_prefix": true},
+  "constraints": {"data_policy": "local_only", "max_ttft_ms": 800, "max_p95_latency_ms": 6000},
+  "budget": {"max_trials": 6, "max_wall_seconds": 3600, "max_spend": 0},
+  "evidence": {"baseline_ref": "example:mac-streaming-serving-v1", "evaluator_ref": "example:response-acceptance-v1", "representative_inputs_ref": "example:mac-streaming-replay-reserved-v1", "labeled_examples": 0, "failure_modes": ["slow_first_token"], "consumed_holdout": false}
+}

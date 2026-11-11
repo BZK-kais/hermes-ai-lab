@@ -1,0 +1,28 @@
+name: ai-lab
+version: 1.0.0
+requires_hermes: '>=0.20.1'
+kind: standalone
+description: A local AI lab for Hermes to prepare experiments, train, compare, qualify, share and use model configurations with rollback.
+provides_tools:
+  - ai_lab_status
+  - ai_lab_list_local_models
+  - ai_lab_hf_model_info
+  - ai_lab_probe_endpoint
+  - ai_lab_connections
+  - ai_lab_connection_probe
+  - ai_lab_operations
+  - ai_lab_plan
+  - ai_lab_run
+  - ai_lab_job
+  - ai_lab_provider_action
+  - ai_lab_dataset_validate
+  - ai_lab_artifact_inspect
+  - ai_lab_generate
+  - ai_lab_profile
+  - ai_lab_experiment
+  - ai_lab_analyze
+  - ai_lab_benchmark
+  - ai_lab_optimize
+  - ai_lab_onboarding
+  - ai_lab_mission
+  - ai_lab_registry

@@ -1,0 +1,51 @@
+{
+  "version": "pair-paraphrase-v1",
+  "splits": {
+    "train": "train.jsonl",
+    "dev": "dev.jsonl",
+    "producer": "producer_test.jsonl",
+    "receiver": "receiver_test.jsonl"
+  },
+  "split_sizes": {
+    "train": 1024,
+    "dev": 64,
+    "producer": 128,
+    "receiver": 128
+  },
+  "seeds": {
+    "sampling": 20261109,
+    "training": 20261109
+  },
+  "limits": {
+    "max_prompt_candidates_dev": 2,
+    "max_training_candidates_dev": 2,
+    "max_final_candidates": 1
+  },
+  "thresholds": {
+    "producer": {
+      "min_correct": 104,
+      "min_net_corrections": 8,
+      "max_false_same_increase": 0,
+      "min_cpu_correct_gain": 4
+    },
+    "receiver": {
+      "min_correct": 104,
+      "min_net_corrections": 8,
+      "max_false_same_increase": 0,
+      "min_cpu_correct_gain": 4
+    }
+  },
+  "selection": {
+    "baseline": "Select the prompt by dev correct count, then fewer false_same cases, then declaration order.",
+    "adaptation": "Use the selected prompt and rank declared training candidates by dev correct count, then fewer false_same cases, then declaration order.",
+    "cpu": "Fit each of two fixed configurations on train. Select by dev correct count, then fewer false_same cases, then declaration order. Use a fixed probability threshold of 0.5.",
+    "final": "Freeze choices before either final set. Evaluate producer and receiver separately and use the identical base, prompt and decoder for the unadapted and adapted language model."
+  },
+  "scoring": {
+    "correct": "The canonical label equals the source label. Invalid output counts as incorrect.",
+    "net_corrections": "Adapted correct count minus unadapted correct count on the same rows.",
+    "false_same": "Number of different pairs predicted same. False-positive rate is false_same divided by the number of different pairs.",
+    "cpu_gain": "Adapted correct count minus the frozen CPU baseline correct count on the same rows.",
+    "report": "Report per-class and paired results separately for both held-out sets. Claims apply to sampled PAWS-Wiki pairs."
+  }
+}

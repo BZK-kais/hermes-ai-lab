@@ -1,0 +1,39 @@
+{
+  "dataset": "PAWS-Wiki labeled_final, public human-annotated sentence pairs",
+  "source": "google-research-datasets/paws",
+  "revision": "161ece9501cf0a11f3e48bd356eaa82de46d6a09",
+  "license_url": "https://raw.githubusercontent.com/google-research-datasets/paws/master/LICENSE",
+  "customer_data": false,
+  "possible_pretraining_contamination": "unknown",
+  "parquet_sha256": {
+    "labeled_final/train-00000-of-00001.parquet": "8dc9ad3e5f30ad9a86b290fe236d528ef23a5751fec9a35d99cbacf68ba277cf",
+    "labeled_final/validation-00000-of-00001.parquet": "7760d829453764ba342a6f562809a8ed21c2c3eec3fd9ffa544089f145d42f6d",
+    "labeled_final/test-00000-of-00001.parquet": "ae342ff12bb84b84b95f468abf5db6cb7c7bd578271299fe9c99be75b8132f4d"
+  },
+  "prior_selection_sha256": {
+    "pair-paraphrase-v1": {
+      "train.jsonl": "1e65dc72daafc604429b444dbd6f8088388266b9606831b89ff6a44d927e7328",
+      "dev.jsonl": "96ad4522bd09c69512d47d946b7bdbcdd778fe6be8d29161c0152202b360c0fa",
+      "producer_test.jsonl": "646ea87428ad933e9b08645c02e0f35077217aad7b339e385811f4f80bb3b32b",
+      "receiver_test.jsonl": "fe06efea7242d80a4ab834f204359e164c64392e09dfd69573d7f6558f696b6f"
+    },
+    "controller-v1": {
+      "dev.jsonl": "5e53884501f2008cfee1f4094ef68460ddfc2ad8bcf7eb802b2c59767fb9ebfb",
+      "test.jsonl": "ff85a612bc684dc128ec4ead0999da88d5e5dbbe229acc0fbf737ea123a8716e"
+    }
+  },
+  "sampling_seed": 20261111,
+  "source_splits": {
+    "train": "train",
+    "dev": "validation",
+    "test": "test"
+  },
+  "normalization": "Unicode NFKC, casefold, replace non-alphanumerics with spaces and collapse whitespace",
+  "family": "Connected components across all three official splits, identified by a SHA256 of the smallest normalized member",
+  "sampling": "Exclude components crossing official splits. Retain the prior training set and reuse the controller development file byte for byte. For additions and final test, sort unused source rows by ID before seeded shuffling. Select at most one row per component up to the label quotas.",
+  "output_sha256": {
+    "train.jsonl": "105965fb81ea16e3b9cd1acf6e3f375a87a7b5698b105d9b92d618cee60f79da",
+    "dev.jsonl": "5e53884501f2008cfee1f4094ef68460ddfc2ad8bcf7eb802b2c59767fb9ebfb",
+    "test.jsonl": "0742fe795badc2300cee36a1b0c10c86105d72fe526b34d68072a64705d54d2a"
+  }
+}

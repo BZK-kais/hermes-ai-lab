@@ -1,0 +1,46 @@
+{
+  "version": "triage-v1",
+  "splits": {
+    "train": "train.jsonl",
+    "dev": "dev.jsonl",
+    "producer": "producer_test.jsonl",
+    "receiver": "receiver_test.jsonl"
+  },
+  "seeds": {
+    "dataset_order": {
+      "train": 3107,
+      "dev": 3108,
+      "producer": 3109,
+      "receiver": 3110
+    },
+    "training": 3111
+  },
+  "limits": {
+    "max_prompt_candidates_dev": 2,
+    "max_training_candidates_dev": 2,
+    "max_final_candidates": 1
+  },
+  "thresholds": {
+    "producer": {
+      "min_correct": 34,
+      "min_net_corrections": 4
+    },
+    "receiver": {
+      "min_correct": 20,
+      "min_net_corrections": 0
+    },
+    "max_ambiguous_wrong_orientation_increase": 0
+  },
+  "selection": {
+    "baseline": "Évaluer les deux prompts sur dev avec la même base et le même décodage. Retenir celui qui classe le plus de cas correctement, puis le premier dans l'ordre de prompt_candidates.json en cas d'égalité.",
+    "adaptation": "Évaluer jusqu'à deux configurations de formation sur dev avec le prompt de la baseline. Retenir celle qui classe le plus de cas correctement, puis la première configuration déclarée en cas d'égalité. Figer l'identité de la base et les paramètres de chaque configuration avant son lancement.",
+    "final": "Évaluer une seule fois la configuration retenue et sa baseline, avec le même prompt, la même base et le même décodage, sur les deux jeux finaux. Les jeux finaux ne servent à aucun ajustement."
+  },
+  "scoring": {
+    "correct": "Le JSON est valide, respecte le schéma et contient le label attendu. Un JSON invalide ou a_clarifier sur un cas clair compte comme un échec.",
+    "net_corrections": "Nombre d'échecs de la baseline corrigés par le candidat moins nombre de réponses correctes de la baseline ratées par le candidat, sur les mêmes lignes.",
+    "ambiguous_wrong_orientation": "Sur une ligne attendue a_clarifier, une prédiction valide bug, configuration ou demande. Comparer le compte entre candidat et baseline sur chaque jeu final séparément. Un JSON invalide compte comme échec global.",
+    "report": "Publier les comptes par classe et les corrections et régressions appariées. Isoler le temps de formation, la taille du paquet, la mémoire observable et la latence complète."
+  },
+  "decoding": "Si décodage contraint, classer par log-vraisemblance des quatre sorties JSON canoniques avec un calcul identique sur la base et son adaptation. Ces scores ne mesurent pas une probabilité de justesse calibrée."
+}
