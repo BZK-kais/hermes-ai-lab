@@ -8,7 +8,7 @@ import zipfile
 
 PROJECT = Path(__file__).resolve().parents[1]
 MANIFEST = 'MANIFEST.sha256'
-ROOT_FILES = ('__init__.py', 'plugin.yaml', 'pyproject.toml', 'README.md', 'STATUS.md', 'LICENSE')
+ROOT_FILES = ('__init__.py', 'plugin.yaml', 'pyproject.toml', 'README.md', 'README.fr.md', 'STATUS.md', 'LICENSE')
 SCRIPTS = ('build_release.py', 'build_remote_worker.py', 'check_hermes_registration.py',
            'evaluate_pair_baselines.py', 'install_cli.py', 'install_local.py', 'prepare_demo.py')
 EXAMPLES = {

@@ -1,84 +1,103 @@
-# Hermes AI Lab 1.1
+# Hermes AI Lab 1.1.1
 
-AI Lab est un plugin natif pour préparer une mission, comparer des configurations de modèle et utiliser celle qui satisfait les critères fixés. Il expose **22 outils Hermes** et le skill **`ai-lab:workflow`**. Les jobs, les rapports et les configurations actives sont rattachés au profil. Le même contrat est accessible par le CLI `ailab`, MCP stdio et une API HTTP locale.
+[Lire le README en français](README.fr.md)
 
-## Installer dans Hermes
+AI Lab is a native Hermes plugin for planning experiments, comparing model configurations, and using a configuration that meets your criteria. It exposes **22 Hermes tools** and the **`ai-lab:workflow`** skill. Jobs, reports, and active configurations belong to a profile. The same tool contract is available through the `ailab` CLI, MCP over stdio, and a local HTTP API.
 
-Décompresser l’archive du plugin, puis utiliser **le Python de l’installation Hermes** (Hermes 0.23.1 ou plus récent) avec un profil existant.
+## Install in Hermes
+
+Extract the plugin archive, then run the installer with **the Python interpreter from your Hermes installation** (Hermes 0.23.1 or later) and an existing profile.
 
 ```sh
-/chemin/vers/python-hermes /chemin/archive/ai-lab/scripts/install_local.py \
-  --home /chemin/profil-hermes
+/path/to/hermes-python /path/to/extracted/ai-lab/scripts/install_local.py \
+  --home /path/to/hermes-profile
 ```
 
-L’installateur copie le plugin dans `plugins/ai-lab` et l’active pour la prochaine session. Il préserve toute installation différente déjà présente. L’archive contient le code, la documentation et les exemples. Le wheel fournit le code et un jeu de vérification. Les deux distributions excluent les poids locaux, les secrets et l’état utilisateur.
+The installer copies the plugin to `plugins/ai-lab` and enables it for the next session. It preserves any different installation already present. The archive includes the code, documentation, and examples. The wheel includes the code and verification fixtures. Both distributions exclude local model weights, secrets, and user state.
 
-Pour mettre à jour une copie installée depuis une release, relancer `install_local.py --home /chemin/profil-hermes --upgrade` depuis la nouvelle archive. L’installateur vérifie la copie existante et retourne `backup_path` lorsqu’il crée une sauvegarde.
+To update an installation from a release, run `install_local.py --home /path/to/hermes-profile --upgrade` from the new archive. The installer verifies the existing copy and returns `backup_path` when it creates a backup.
 
-Dans le profil choisi, déclarer les répertoires locaux existants et l’interpréteur de l’environnement MLX. Chaque chemin est ajouté par une option explicite de l’opérateur. `setup --check` consulte l’état du profil et la présence de l’exécutable.
+In the selected profile, register your existing local directories and the Python interpreter for your MLX environment. Each path requires an explicit operator flag. `setup --check` checks the profile state and whether the executable is present.
 
 ```sh
 hermes ai-lab setup \
-  --model-root /chemin/modeles \
-  --data-root /chemin/donnees \
-  --mlx-python /chemin/venv-mlx/bin/python
+  --model-root /path/to/models \
+  --data-root /path/to/data \
+  --mlx-python /path/to/mlx-venv/bin/python
 hermes ai-lab setup --check
 hermes ai-lab profile
 ```
 
-Ouvrir une nouvelle session Hermes. Exemple de demande : « Utilise `ai-lab:workflow` pour rendre mon modèle local plus rapide sur ce jeu d'extraction JSON. Choisis les réglages compatibles, compare-les et conserve les résultats pour les prochains essais. » Le skill prend en charge les choix techniques ; il demande seulement le contexte métier ou les accès réellement manquants.
+Open a new Hermes session. For example, ask “Use `ai-lab:workflow` to make my local model faster on this JSON extraction dataset. Choose compatible settings, compare them, and save the results for future trials.” The skill handles technical choices and asks for essential task context or access when it is missing.
 
-## Accès et limites de la version 1.1
+## Access and limits in version 1.1
 
-Les accès facultatifs se configurent dans les paramètres du plugin Hermes. Les clés déclarées sont lues par `agent.secret_scope.get_secret` dans le profil actif. Les connexions contiennent uniquement une référence telle que `hermes:AI_LAB_HF_TOKEN`. Les anciennes références `env:`, `file:`, `gcp:` et `native` sont refusées. Le plugin ne lit aucun coffre de credentials, ne lance pas `gcloud` et ne réutilise pas les identifiants implicites des SDK. Voir [la migration des accès](docs/credential-migration.md) et [les vérifications 1.1](docs/releases/2026-11-11-credentials.md).
+Configure optional access in the Hermes plugin settings. The plugin reads declared keys with `agent.secret_scope.get_secret` in the active profile. Connection records contain only a reference such as `hermes:AI_LAB_HF_TOKEN`. The plugin rejects legacy `env:`, `file:`, `gcp:`, and `native` references. It does not read credential stores, run `gcloud`, or use implicit SDK credentials. See the [credential migration guide](docs/credential-migration.md) and [1.1 verification notes](docs/releases/2026-11-11-credentials.md).
 
-Google utilise le client OAuth de l’utilisateur déclaré dans Hermes et `hermes auth add ai-lab:google`. Hermes conserve et renouvelle les jetons. GCS expose uniquement les métadonnées en lecture ; les transferts GCS et l’exécution SSH attendent une route Hermes adaptée et retournent une erreur explicite. Les transferts HF/S3 s’exécutent dans la session active avec un reçu de job, sans reprise automatique après perte de session. Les jobs locaux restent détachés.
+Google access uses your OAuth client configured in Hermes and `hermes auth add ai-lab:google`. Hermes stores and refreshes the tokens. GCS supports read-only metadata access. GCS transfers and SSH execution return explicit errors pending a suitable Hermes integration. Hugging Face and S3 transfers run in the active session and issue a job receipt. They do not resume automatically if the session ends. Local jobs run detached.
 
-**Comportements à connaître avant installation :** les opérations explicites peuvent appeler Hugging Face, Runpod, AWS S3, Google Storage et les endpoints configurés ; lire les modèles et données sous les répertoires autorisés ; écrire les artefacts et rapports du profil ; lancer des exécutables locaux et des jobs longs. Aucun compte cloud, téléchargement de poids, entraînement ou coût distant n’est engagé par la découverte. Les budgets déclarés ne plafonnent pas la facturation fournisseur. Les secrets des appels SDK passent uniquement en mémoire dans un canal stdin privé ; cela ne constitue pas une isolation contre du code exécuté sous le même compte système.
+Explicit operations can contact Hugging Face, Runpod, AWS S3, Google Cloud Storage, and configured endpoints. They can read models and data under approved directories, write profile artifacts and reports, and launch local executables and long-running jobs. Discovery does not provision cloud accounts, download model weights, start training, or incur remote charges. Declared budgets do not cap provider billing. SDK calls pass secrets through a private stdin channel in memory. Code running under the same system account may still be able to access those secrets.
 
-## Boucle automatique dans le checkout de développement
+## Cloud action boundary
 
-`ai_lab_mission` propose `autoplan`, `autostart`, `autoreport` et `lessons`. À partir de la tâche, de l'objectif, du modèle et du jeu local, le planificateur choisit des essais compatibles, explicite ses valeurs par défaut et réutilise les résultats correspondant au même contexte. `autostart` lance la campagne bornée ; `autoreport` vérifie le job local avant de retenir les leçons. L'exploration reste en développement lorsqu'il manque un contrat de qualification. Les seuils fournis sont conservés.
-
-L'agent s'appuie sur des recettes conditionnelles issues de projets étudiés. Les options CUDA, MoE et distribuées encore non exécutables sont distinguées des essais MLX disponibles. Cette boucle n'entraîne pas les poids de l'agent et n'active pas un candidat. Voir [la boucle et ses preuves](docs/recipes/learning-loop.md). Les archives 1.0 déjà produites restent des instantanés antérieurs à cette évolution locale.
-
-## De la mission à l’inférence
-
-1. **Préparer.** `ai_lab_analyze` recense le contexte manquant. `ai_lab_mission` construit un protocole à partir du jeu de données, de la référence, des variantes déclarées, des seuils et du budget. Le test réservé reste opaque pendant la préparation. Voir le [guide de mission](docs/mission.md).
-2. **Mesurer.** Transmettre `start_request` à `ai_lab_optimize`, suivre le job avec `ai_lab_job`, puis lire le rapport. Le contrôleur sélectionne sur le développement et évalue la référence et le finaliste sur le test réservé. Une campagne limitée au développement sert à la présélection. Voir les [règles de décision](docs/controller.md).
-3. **Capturer et activer.** Avec `ai_lab_registry`, `capture` enregistre la configuration acceptée à partir d’un job complet du profil. `activate` vérifie les actifs et désigne l’entrée à utiliser. La réussite technique du job et le verdict de qualification sont deux informations distinctes.
-4. **Générer.** `generate` soumet un job avec la configuration active, figée au moment de la soumission. `result` récupère son statut ou la réponse vérifiée.
-5. **Transférer.** `export` produit un ZIP avec les réglages d’inférence, les empreintes, le résumé d’évaluation et l’adaptateur éventuel. `import` l’associe aux poids de base locaux correspondants et crée une entrée inactive. Pour l’utiliser, qualifier sa configuration dans le profil cible, capturer le résultat puis activer cette nouvelle entrée.
-6. **Revenir en arrière.** `rollback` restaure l’activation précédente, y compris l’état initial sans configuration active. Voir les [commandes du registre](docs/registry.md).
-
-Les commandes natives `hermes ai-lab mission`, `optimize`, `job` et `registry` acceptent `--args-file`. La [démonstration reproductible](examples/lifecycle-v1/README.md) prépare 16 cas synthétiques où la valeur à recopier figure dans un champ JSON. Elle vérifie le cycle de qualification sur cette tâche et une seule configuration.
-
-Le contrôleur 1.0 utilise **MLX sur Apple Silicon**, une requête à la fois, avec une correction par correspondance exacte en JSON ou en texte. Les résultats portent sur les données, le modèle, les réglages et le matériel mesurés. Dans l’expérience PAWS historique, l’ancien LoRA obtient **159/192** et le nouveau **158/192**, avec **7 et 33 fausses équivalences** respectivement. La campagne reste non qualifiée. [Rapport PAWS](docs/experiments/2026-11-09-lora-improve.md)
-
-## Opérations et suivi des entraînements
-
-`hermes ai-lab operations` ou `ailab operations` expose les **21 opérations nommées**, leurs paramètres et leurs prérequis. Elles couvrent Hugging Face, MLX, llama.cpp, TRL/PEFT, Unsloth, LLaMA-Factory, NeMo, lm-eval, l’export de sessions Hermes et les transferts HF/S3. L’accès à une opération dépend du moteur, de ses dépendances et des connexions configurées. L’exécution sur NVIDIA et chez les fournisseurs de calcul distants reste à vérifier sur les environnements cibles. [Contrats des connecteurs](docs/provider-adapters.md)
-
-Pour `mlx.train`, fournir le modèle, le dossier de données et un nouveau dossier de sortie sous le workspace. `steps_per_report`, `steps_per_eval` et `save_every` règlent la fréquence des pertes d’entraînement, des pertes de validation et des checkpoints. Le CLI MLX-LM utilise ses propres fréquences si ces paramètres sont omis.
+Model-facing tools may read supported providers through the connector-specific metadata actions (`probe`, `list`, `get`, and `logs` where available). Creating, stopping, deleting or cancelling cloud resources, uploading to HF/S3, and calling any upstream MCP tool require an explicit **named operator CLI command**. `ai_lab_run` also refuses `storage.upload` through model-facing interfaces. This check applies to native Hermes tools, generic `ailab call`, stdio MCP and the local HTTP API, including authenticated requests.
 
 ```sh
-ailab plan mlx.train --params-file /chemin/entrainement.json
-ailab run mlx.train --params-file /chemin/entrainement.json
-ailab jobs logs IDENTIFIANT
+ailab provider-action CONNECTION ACTION --params-file /path/parameters.json
+ailab run storage.upload --params-file /path/transfer.json
+hermes ai-lab provider-action --args-file /path/provider-request.json
+hermes ai-lab run --args-file /path/run-request.json
 ```
 
-Les points de contrôle sont numérotés. Le job vérifie la présence des fichiers finaux `adapter_config.json` et `adapters.safetensors`. Pour qualifier l’adaptateur exporté, l’ajouter explicitement à une campagne d’évaluation. [Suivre un entraînement MLX](docs/mission.md#observer-un-entraînement-mlxtrain)
+The native provider request is `{"connection_id":"CONNECTION","action":"ACTION","parameters":{}}`; the run request contains `operation` and `parameters`. Existing credential and path requirements still apply. A JSON flag, a bearer token, a declared budget or an upstream MCP tool annotation does not grant operator authority. MCP connection discovery remains available through `ai_lab_connection_probe`; an upstream tool named `probe` or `list` is still an opaque tool call and requires the operator command.
 
-## CLI indépendant, MCP et HTTP
+Local model operations and explicitly requested inference keep their existing contracts. Remote inference can be billable, and downloads write local files. This boundary controls built-in provider routes; it is not an OS sandbox against trusted Python code or shell commands running as the same user. [Review fix and verification](docs/releases/2026-11-12-catalog-review.md)
 
-Installer le wheel avec Python 3.9 ou plus récent, dans un environnement dédié. Le stockage reste extérieur au paquet. Avec un profil Hermes configuré il se trouve sous `ai-lab/` dans ce profil, et en mode standalone neuf sous le répertoire de données utilisateur `hermes-ai-lab`.
+## Automated experiment loop in the development checkout
+
+`ai_lab_mission` supports `autoplan`, `autostart`, `autoreport`, and `lessons`. Given a task, objective, model, and local dataset, the planner chooses compatible trials, states its defaults, and reuses results from the same context. `autostart` launches the bounded campaign. `autoreport` verifies the local job before recording lessons. Exploration stays on the development split when qualification criteria are missing. The planner preserves any supplied thresholds.
+
+The agent uses conditional recipes drawn from reviewed projects. The available MLX trials are documented alongside CUDA, MoE, and distributed options that cannot yet be executed. The loop learns by recording evaluation results in the profile. Candidate activation is a separate registry operation. See the [learning loop and its evidence](docs/recipes/learning-loop.md). The existing 1.0 archives predate this local development work.
+
+## From mission to inference
+
+1. **Prepare.** `ai_lab_analyze` identifies missing context. `ai_lab_mission` builds a protocol from the dataset, baseline, declared variants, thresholds, and budget. The held-out test set stays hidden during preparation. See the [mission guide](docs/mission.md).
+2. **Measure.** Pass `start_request` to `ai_lab_optimize`, track the job with `ai_lab_job`, and read the report. The controller selects a finalist on the development split and evaluates the baseline and finalist on the held-out test set. A development-only campaign serves as a screening run. See the [decision rules](docs/controller.md).
+3. **Capture and activate.** With `ai_lab_registry`, use `capture` to save the accepted configuration from a completed profile job. `activate` verifies the assets and selects the entry to use. Check both the job outcome and the qualification verdict.
+4. **Generate.** `generate` submits a job with a snapshot of the active configuration. `result` retrieves its status or the verified response.
+5. **Transfer.** `export` creates a ZIP with the inference settings, fingerprints, evaluation summary, and adapter if present. `import` associates the package with the matching local base weights and creates an inactive entry. To use it, qualify the configuration in the target profile, capture the result, and activate the new entry.
+6. **Roll back.** `rollback` restores the previous activation, including the initial state with no active configuration. See the [registry commands](docs/registry.md).
+
+The native `hermes ai-lab mission`, `optimize`, `job`, and `registry` commands accept `--args-file`. The [reproducible demo](examples/lifecycle-v1/README.md) prepares 16 synthetic cases where the value to copy appears in a JSON field. It verifies the qualification lifecycle on that task and one configuration.
+
+The 1.0 controller runs **MLX on Apple Silicon**, one request at a time, using exact-match scoring for JSON or text. Results apply to the measured data, model, settings, and hardware. In the historical PAWS experiment, the previous LoRA scored **159/192** and the new one **158/192**, with **7 and 33 false equivalences**, respectively. The campaign did not qualify a candidate. [PAWS report](docs/experiments/2026-11-09-lora-improve.md)
+
+## Operations and training progress
+
+`hermes ai-lab operations` or `ailab operations` lists the **21 named operations**, their parameters, and prerequisites. They cover Hugging Face, MLX, llama.cpp, TRL/PEFT, Unsloth, LLaMA-Factory, NeMo, lm-eval, Hermes session export, and Hugging Face and S3 transfers. Operation availability depends on the engine, its dependencies, and configured connections. Execution on NVIDIA hardware and remote compute providers still needs verification in the target environments. [Connector contracts](docs/provider-adapters.md)
+
+For `mlx.train`, supply the model, dataset directory, and a new output directory under the workspace. `steps_per_report`, `steps_per_eval`, and `save_every` control how often the job reports training loss and validation loss and saves checkpoints. The MLX-LM CLI uses its defaults when you omit these parameters.
 
 ```sh
-python3 -m pip install /chemin/hermes_ai_lab-1.1.0-py3-none-any.whl
+ailab plan mlx.train --params-file /path/to/training.json
+ailab run mlx.train --params-file /path/to/training.json
+ailab jobs logs JOB_ID
+```
+
+Checkpoints are numbered. The job checks for the final `adapter_config.json` and `adapters.safetensors` files. To qualify the exported adapter, explicitly add it to an evaluation campaign. [Monitor MLX training](docs/mission.md#observer-un-entraînement-mlxtrain)
+
+## Standalone CLI, MCP, and HTTP
+
+Install the wheel with Python 3.9 or later in a dedicated environment. State is stored outside the package. When a Hermes profile is configured, state lives under `ai-lab/` in that profile. A fresh standalone installation uses the `hermes-ai-lab` user data directory.
+
+```sh
+python3 -m pip install /path/to/hermes_ai_lab-1.1.1-py3-none-any.whl
 ailab setup --check
 ailab operations
 ```
 
-L’extra `mcp` fournit le SDK pour `ailab mcp`. L’extra `providers` fournit les SDK des connecteurs correspondants. `ailab api --port 8765` ouvre une API d’outils sur `127.0.0.1`, protégée par `AI_LAB_HTTP_API_KEY` configurée dans Hermes (au moins 32 caractères). Aucun fichier de jeton n’est créé ni lu. Sans le runtime Hermes et un accès déclaré, les opérations authentifiées échouent explicitement. `GET /health` donne l’état du service. `GET /tools` et `POST /tools/call` exigent le jeton Bearer. Un appel contient `name` et `arguments`, par exemple `{"name":"ai_lab_operations","arguments":{}}`. Cette interface sert au dispatch des outils AI Lab. Les clients OpenAI Chat Completions utilisent un autre contrat.
+The `mcp` extra supplies the SDK for `ailab mcp`. The `providers` extra supplies the SDKs for the corresponding connectors. `ailab api --port 8765` serves the tool API on `127.0.0.1`. It requires `AI_LAB_HTTP_API_KEY`, configured in Hermes with at least 32 characters. The API does not create or read a token file. Authenticated operations fail explicitly without the Hermes runtime and declared access.
 
-Pour les résultats datés, les artefacts de livraison et les limites de vérification, consulter le [rapport 1.0](docs/releases/2026-11-11-v1.md), [STATUS.md](STATUS.md) et le [contrat de livraison](docs/RELEASE-CONTRACT.md).
+`GET /health` returns service status. `GET /tools` and `POST /tools/call` require the bearer token. A tool call contains `name` and `arguments`, for example `{"name":"ai_lab_operations","arguments":{}}`. This interface dispatches AI Lab tools. OpenAI Chat Completions clients use a separate API contract.
+
+For dated results, release artifacts, and verification limits, see the [1.0 release report](docs/releases/2026-11-11-v1.md), [STATUS.md](STATUS.md), and the [release contract](docs/RELEASE-CONTRACT.md).

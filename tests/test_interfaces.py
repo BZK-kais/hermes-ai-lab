@@ -93,7 +93,7 @@ class HTTPTests(unittest.TestCase):
 
     def test_auth_health_and_real_operations(self):
         status, headers, body = self.request('GET', '/health')
-        self.assertEqual(status, 200); self.assertEqual(body['api_version'], '1.1.0')
+        self.assertEqual(status, 200); self.assertEqual(body['api_version'], tool_api.API_VERSION)
         self.assertEqual(headers['Cache-Control'], 'no-store')
         self.assertNotIn(self.token, json.dumps(body))
         self.assertFalse(self.token_file.exists())

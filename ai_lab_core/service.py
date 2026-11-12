@@ -128,7 +128,11 @@ def job(action="list", job_id=None, limit=20):
 
 def provider_action(connection_id, action, parameters):
     from .integration_config import find_connection
+    from .operator_policy import provider_denial
     c = find_connection(connection_id)
+    denial = provider_denial(c['type'], action)
+    if denial is not None:
+        return denial
     if c["type"] == "ssh":
         from .remote import provider_action as invoke
     elif c["type"] == "mcp":

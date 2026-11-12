@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 from . import tool_api
+from .operator_policy import operator_scope
 
 
 def _params(parser):
@@ -92,7 +93,11 @@ def main():
                 values = {'request': values}
         if not name.startswith('ai_lab_'):
             name = 'ai_lab_' + name
-        result = tool_api.dispatch(name, values)
+        if command in ('provider-action', 'run'):
+            with operator_scope(command):
+                result = tool_api.dispatch(name, values)
+        else:
+            result = tool_api.dispatch(name, values)
     except (ValueError, OSError, UnicodeError, RecursionError):
         result = tool_api.failure('invalid_arguments', 'Supply a bounded JSON object or readable parameter file.')
     print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))

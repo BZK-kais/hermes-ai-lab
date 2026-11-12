@@ -38,12 +38,12 @@ _DEFS = (
     ('connection_probe', 'Probe one configured connection; discovery does not provision resources.', {'connection_id': _string(128)}, ('connection_id',)),
     ('operations', 'List named operations and their parameter contracts.', {}, ()),
     ('plan', 'Validate and preview a named operation without executing it.', {'operation': _string(128), 'parameters': _JSON_OBJECT}, ('operation', 'parameters')),
-    ('run', 'Execute a named, validated operation and return its durable job identifier.', {'operation': _string(128), 'parameters': _JSON_OBJECT}, ('operation', 'parameters')),
+    ('run', 'Execute a named, validated operation and return its durable job identifier. Remote storage uploads require the named operator CLI run command.', {'operation': _string(128), 'parameters': _JSON_OBJECT}, ('operation', 'parameters')),
     ('job', 'List, inspect, read logs, cancel, or reconcile durable AI Lab jobs.', {'action': {'type': 'string', 'enum': ['list', 'get', 'status', 'logs', 'cancel', 'reconcile'], 'default': 'list'}, 'job_id': _string(64), 'limit': {**_integer(20, 64000), 'description': 'List limit is at most 200; log character limit is at most 64000.'}}, ()),
-    ('provider_action', 'Perform an explicit named action on a configured provider connection; actions may create paid resources.', {'connection_id': _string(128), 'action': _string(128), 'parameters': _JSON_OBJECT}, ('connection_id', 'action', 'parameters')),
+    ('provider_action', 'Read metadata or logs from a supported provider connection. Remote changes and all upstream MCP tool calls require the named operator CLI provider-action command and may incur charges.', {'connection_id': _string(128), 'action': _string(128), 'parameters': _JSON_OBJECT}, ('connection_id', 'action', 'parameters')),
     ('dataset_validate', 'Validate a dataset at an operator-selected local path without training.', {'path': _string(4096)}, ('path',)),
     ('artifact_inspect', 'Inspect an operator-selected local model artifact; hashing is optional.', {'path': _string(4096), 'hash_files': {'type': 'boolean', 'default': False}}, ('path',)),
-    ('generate', 'Generate bounded text using an explicitly selected configured connection and model.', {'connection_id': _string(128), 'model': _string(256), 'prompt': _string(65536), 'max_tokens': _integer(128, 2048)}, ('connection_id', 'model', 'prompt')),
+    ('generate', 'Generate bounded text using an explicitly selected inference connection and model. Remote inference may incur charges.', {'connection_id': _string(128), 'model': _string(256), 'prompt': _string(65536), 'max_tokens': _integer(128, 2048)}, ('connection_id', 'model', 'prompt')),
     ('profile', 'Inspect the AI Lab data directories bound to this Hermes profile without reading credentials.', {}, ()),
     ('onboarding', 'Check local setup or initialize this profile workspace and state. Model/data roots and executable bindings are configured through the operator setup CLI. Does not download, train, provision or activate models.', {
         'request': {'type': 'object', 'additionalProperties': False, 'properties': {

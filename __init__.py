@@ -6,6 +6,7 @@ from pathlib import Path
 
 def register(ctx):
     api = importlib.import_module('.ai_lab_core.tool_api', package=__package__)
+    policy = importlib.import_module('.ai_lab_core.operator_policy', package=__package__)
     profiles = importlib.import_module('.ai_lab_core.profile', package=__package__)
     try:
         from hermes_constants import get_hermes_home
@@ -32,7 +33,7 @@ def register(ctx):
         setup.add_argument('--check', action='store_true', help='Read-only readiness check')
         for flag in ('model-root', 'data-root', 'mlx-python'):
             setup.add_argument('--' + flag, help='Explicit existing local path selected by the operator')
-        for verb in ('experiment', 'job', 'analyze', 'benchmark', 'optimize', 'mission', 'registry', 'onboarding', 'plan', 'run'):
+        for verb in ('experiment', 'job', 'analyze', 'benchmark', 'optimize', 'mission', 'registry', 'onboarding', 'plan', 'run', 'provider-action'):
             command = commands.add_parser(verb, help='Call the native AI Lab ' + verb + ' tool')
             command.add_argument('--args-file', required=True, help='Bounded JSON object of tool arguments')
 
@@ -53,7 +54,12 @@ def register(ctx):
                 values = cli._json_object(filename=args.args_file)
                 if args.ai_lab_command in ('analyze', 'benchmark', 'optimize', 'mission', 'registry', 'onboarding'):
                     values = {'request': values}
-                result = json.loads(ctx.dispatch_tool('ai_lab_' + args.ai_lab_command, values))
+                name = 'ai_lab_' + args.ai_lab_command.replace('-', '_')
+                if args.ai_lab_command in ('provider-action', 'run'):
+                    with policy.operator_scope(args.ai_lab_command):
+                        result = json.loads(ctx.dispatch_tool(name, values))
+                else:
+                    result = json.loads(ctx.dispatch_tool(name, values))
         except (OSError, ValueError, RecursionError):
             result = api.failure('invalid_arguments', 'Supply a readable, bounded JSON object.')
         print(api.encode(result))

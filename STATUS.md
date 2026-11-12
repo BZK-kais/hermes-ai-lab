@@ -1,5 +1,11 @@
 # AI Lab — état vérifié
 
+## Correctif ciblé 1.1.1 — 12 novembre 2026
+
+Les actions de gestion cloud exposées au modèle sont désormais limitées aux lectures propres à chaque connecteur. Les mutations, les uploads et les appels MCP opaques exigent les commandes CLI opérateur nommées. README et skill canoniques sont en anglais, versions françaises conservées. Ce correctif part de la version publique relue; les expériences locales 1.2 sont séparées. [Périmètre et vérifications](docs/releases/2026-11-12-catalog-review.md).
+
+## Historique antérieur
+
 État du 11 novembre 2026 pour la version 1.0.0. [Contrat de livraison](docs/RELEASE-CONTRACT.md) · [Rapport de vérification 1.0](docs/releases/2026-11-11-v1.md)
 
 ## Évolution locale — choix automatiques et leçons vérifiées

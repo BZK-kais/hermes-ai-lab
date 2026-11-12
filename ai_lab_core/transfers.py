@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from .credentials import CredentialError
+from .operator_policy import upload_denial
 from .process_env import runtime_env
 from .providers import _AdapterError, _sdk_call, validate_connection
 
@@ -98,7 +99,7 @@ def catalog(settings:dict)->dict:
              'connections':refs,'execution_verified':False} for op in ('storage.download','storage.upload')]}
 
 
-def _prepare_transfer(operation:str,params:dict,settings:dict)->dict:
+def _prepare_transfer(operation:str,params:dict,settings:dict,*,execute=False)->dict:
     if operation not in ('storage.download','storage.upload'):
         return failure('unknown_operation','Unknown storage transfer operation.')
     if not isinstance(params,dict) or set(params) != set(SCHEMA['required']):
@@ -115,6 +116,10 @@ def _prepare_transfer(operation:str,params:dict,settings:dict)->dict:
     if c['type'] == 'gcs':
         return failure('unsupported_transport',GCS_TRANSFER_UNSUPPORTED)
     download = operation == 'storage.download'
+    if execute and not download:
+        denial = upload_denial()
+        if denial is not None:
+            return denial
     try:
         cap = max_bytes(settings)
         path,root = local_file(params['local_path'],settings.get('workspace_root',''),download)
@@ -145,7 +150,7 @@ def plan_operation(operation:str,params:dict,settings:dict)->dict:
 def run_transfer(operation:str,params:dict,settings:dict)->dict:
     from .jobs import run_live
 
-    result = _prepare_transfer(operation,params,settings)
+    result = _prepare_transfer(operation,params,settings,execute=True)
     if not result['ok']:
         return result
     plan = result['plan']
